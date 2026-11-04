@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kaszta1274/macrorecipe/internal/api"
+	"github.com/kaszta1274/macrorecipe/internal/database"
 	_ "github.com/lib/pq"
 )
 
@@ -35,8 +36,10 @@ func main() {
 	}
 	defer db.Close()
 
+	dbQueries := database.New(db)
+
 	cfg := api.ApiConfig{
-		DB:          db,
+		DB:          dbQueries,
 		TokenSecret: tokenSecret,
 	}
 

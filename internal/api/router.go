@@ -1,15 +1,15 @@
 package api
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/kaszta1274/macrorecipe/internal/database"
 )
 
 type ApiConfig struct {
-	DB          *sql.DB
+	DB          *database.Queries
 	TokenSecret string
 }
 
