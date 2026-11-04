@@ -1,13 +1,19 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter() http.Handler {
+type ApiConfig struct {
+	DB          *sql.DB
+	TokenSecret string
+}
+
+func (cfg *ApiConfig) Router() http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)

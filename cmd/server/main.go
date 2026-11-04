@@ -24,13 +24,23 @@ func main() {
 		log.Fatal("PORT must be set")
 	}
 
+	tokenSecret := os.Getenv("TOKEN_SECRET")
+	if tokenSecret == "" {
+		log.Fatal("TOKEN_SECRET must be set")
+	}
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("could not connect to database: %s", err)
 	}
 	defer db.Close()
 
-	r := api.NewRouter()
+	cfg := api.ApiConfig{
+		DB:          db,
+		TokenSecret: tokenSecret,
+	}
+
+	r := cfg.Router()
 
 	srv := &http.Server{
 		Addr:    ":" + port,
