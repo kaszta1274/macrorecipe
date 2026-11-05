@@ -30,14 +30,13 @@ func MakeJWTWithRole(
 	role database.UserRole,
 	tokenSecret string,
 	expiresIn time.Duration,
-	tokenType string,
 ) (string, error) {
 	signingKey := []byte(tokenSecret)
 
 	claims := CustomClaims{
 		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    tokenType,
+			Issuer:    string(TokenTypeAccess),
 			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
 			Subject:   userID.String(),
