@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/auth"
@@ -125,6 +126,28 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		User:  databaseUserToResponseUser(user),
 		Token: accessToken,
 	})
+}
+
+func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.RespondWithError(w, http.StatusBadRequest, "invalid request", nil)
+		return
+	}
+
+	userId, err := uuid.Parse(id)
+	if err != nil {
+		response.RespondWithError(w, http.StatusInternalServerError, "could not parse id", err)
+		return
+	}
+
+	user, err := h.DB.GetUserById(r.Context(), userId)
+	if err != nil {
+		response.RespondWithError(w, http.StatusNotFound, "could't get user", err)
+		return
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, databaseUserToResponseUser(user))
 }
 
 func databaseUserToResponseUser(user database.User) User {

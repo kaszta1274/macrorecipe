@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/kaszta1274/macrorecipe/internal/api/handler"
+	appmw "github.com/kaszta1274/macrorecipe/internal/api/middleware"
 	"github.com/kaszta1274/macrorecipe/internal/database"
 )
 
@@ -30,6 +31,11 @@ func (cfg *ApiConfig) Router() http.Handler {
 
 	r.Post("/api/auth/register", userHandler.CreateUser)
 	r.Post("/api/auth/login", userHandler.LoginUser)
+
+	r.Group(func(r chi.Router) {
+		r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
+		r.Get("/api/users/{id}", userHandler.GetUserById)
+	})
 
 	return r
 }
