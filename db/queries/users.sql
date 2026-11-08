@@ -21,5 +21,11 @@ SELECT id, email, username, password_hash, role, created_at, updated_at
 FROM users
 WHERE id = $1;
 
--- name: DeleteUsers :exec
-DELETE FROM users;
+-- name: UpdateUser :one
+UPDATE users
+SET username = $1, password_hash = $2, updated_at = NOW()
+RETURNING id, email, username, role, created_at, updated_at;
+
+-- name: DeleteUser :exec
+DELETE FROM users
+WHERE id = $1;
