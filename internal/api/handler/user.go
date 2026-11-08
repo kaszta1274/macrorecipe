@@ -143,7 +143,7 @@ func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
 	if err != nil {
-		response.RespondWithError(w, http.StatusNotFound, "could't get user", err)
+		response.RespondWithError(w, http.StatusNotFound, "could not get user", err)
 		return
 	}
 

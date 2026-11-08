@@ -24,17 +24,35 @@ func (cfg *ApiConfig) Router() http.Handler {
 	r.Use(middleware.Recoverer)
 
 	userHandler := handler.NewUserHandler(cfg.DB, cfg.TokenSecret)
+	ingredientHandler := handler.NewIngredientHandler(cfg.DB, cfg.TokenSecret)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
 
-	r.Post("/api/auth/register", userHandler.CreateUser)
-	r.Post("/api/auth/login", userHandler.LoginUser)
+	r.Route("/api/auth", func(r chi.Router) {
+		r.Post("/register", userHandler.CreateUser)
+		r.Post("/login", userHandler.LoginUser)
+	})
 
-	r.Group(func(r chi.Router) {
-		r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
-		r.Get("/api/users/{id}", userHandler.GetUserById)
+	r.Route("/api/users", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
+			r.Get("/{id}", userHandler.GetUserById)
+		})
+	})
+
+	r.Route("/api/ingredients", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
+			r.Use(appmw.RequireAdmin)
+			r.Post("/", ingredientHandler.CreateIngredient)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
+			r.Get("/{id}", ingredientHandler.GetIngredientById)
+		})
 	})
 
 	return r
