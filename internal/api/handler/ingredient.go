@@ -12,6 +12,7 @@ import (
 )
 
 type Ingredient struct {
+	ID            uuid.UUID `json:"id"`
 	Name          string    `json:"name"`
 	Protein       float32   `json:"protein"`
 	Fat           float32   `json:"fat"`
@@ -99,6 +100,7 @@ func (h *IngredientHandler) GetIngredientById(w http.ResponseWriter, r *http.Req
 
 func databaseIngredientToResponseIngredient(ingredient database.Ingredient) Ingredient {
 	return Ingredient{
+		ID:            ingredient.ID,
 		Name:          ingredient.Name,
 		Protein:       ingredient.Protein,
 		Fat:           ingredient.Fat,

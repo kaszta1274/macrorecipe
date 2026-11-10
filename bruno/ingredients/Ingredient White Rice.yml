@@ -1,0 +1,26 @@
+info:
+  name: Ingredient White Rice
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/admin/ingredients"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "White rice",
+        "protein": 6.5,
+        "fat": 0.5,
+        "carbohydrates": 79.2
+      }
+  auth:
+    type: bearer
+    token: "{{adminJwtToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

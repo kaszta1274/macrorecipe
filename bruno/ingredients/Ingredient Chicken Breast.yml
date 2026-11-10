@@ -1,0 +1,26 @@
+info:
+  name: Ingredient Chicken Breast
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/admin/ingredients"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Chicken breast",
+        "protein": 22.5,
+        "fat": 2.6,
+        "carbohydrates": 0
+      }
+  auth:
+    type: bearer
+    token: "{{adminJwtToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

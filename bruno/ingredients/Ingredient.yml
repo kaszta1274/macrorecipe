@@ -1,0 +1,17 @@
+info:
+  name: Ingredient
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/ingredients/7970f68a-75e5-4b66-a00e-a3e34d498d2d"
+  auth:
+    type: bearer
+    token: "{{jwtToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

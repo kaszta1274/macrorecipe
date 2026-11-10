@@ -22,7 +22,7 @@ runtime:
         let resData = res.getBody();
 
         if (resData && resData.token) {
-          bru.setEnvVar("jwt_token", resData.token);
+          bru.setEnvVar("jwtToken", resData.token);
         }
 
 settings:

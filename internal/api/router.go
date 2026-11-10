@@ -35,24 +35,19 @@ func (cfg *ApiConfig) Router() http.Handler {
 		r.Post("/login", userHandler.LoginUser)
 	})
 
-	r.Route("/api/users", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
-			r.Get("/{id}", userHandler.GetUserById)
-		})
+	r.Route("/api", func(r chi.Router) {
+		r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
+
+		r.Get("/users/{id}", userHandler.GetUserById)
+
+		r.Get("/ingredients/{id}", ingredientHandler.GetIngredientById)
 	})
 
-	r.Route("/api/ingredients", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
-			r.Use(appmw.RequireAdmin)
-			r.Post("/", ingredientHandler.CreateIngredient)
-		})
+	r.Route("/api/admin", func(r chi.Router) {
+		r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
+		r.Use(appmw.RequireAdmin)
 
-		r.Group(func(r chi.Router) {
-			r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
-			r.Get("/{id}", ingredientHandler.GetIngredientById)
-		})
+		r.Post("/ingredients", ingredientHandler.CreateIngredient)
 	})
 
 	return r
