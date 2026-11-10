@@ -1,0 +1,17 @@
+info:
+  name: User
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/users/90cfafe4-46bf-4d42-8d36-555eb9946412"
+  auth:
+    type: bearer
+    token: "{{jwt_token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
