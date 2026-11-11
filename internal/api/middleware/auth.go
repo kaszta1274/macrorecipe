@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
@@ -24,9 +23,10 @@ func AuthMiddleware(tokenSecret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "user_id", userId)
-			ctx = context.WithValue(r.Context(), "role", role)
-
+			ctx := auth.WithAuthContext(r.Context(), auth.AuthContext{
+				UserID: userId,
+				Role:   role,
+			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -34,12 +34,11 @@ func AuthMiddleware(tokenSecret string) func(http.Handler) http.Handler {
 
 func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		role, ok := r.Context().Value("role").(database.UserRole)
-		if !ok || role != database.UserRoleAdmin {
+		authCtx, ok := auth.FromContext(r.Context())
+		if !ok || authCtx.Role != database.UserRoleAdmin {
 			response.RespondWithError(w, http.StatusForbidden, "requires admin", nil)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }

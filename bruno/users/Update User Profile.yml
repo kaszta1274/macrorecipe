@@ -1,0 +1,23 @@
+info:
+  name: Update User Profile
+  type: http
+  seq: 1
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/users/profile"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "Test1"
+      }
+  auth:
+    type: bearer
+    token: "{{jwtToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -39,6 +39,9 @@ func (cfg *ApiConfig) Router() http.Handler {
 		r.Use(appmw.AuthMiddleware(cfg.TokenSecret))
 
 		r.Get("/users/{id}", userHandler.GetUserById)
+		r.Patch("/users/profile", userHandler.UpdateUsername)
+		r.Patch("/users/password", userHandler.UpdatePassword)
+		r.Delete("/users", userHandler.DeleteUser)
 
 		r.Get("/ingredients/{id}", ingredientHandler.GetIngredientById)
 	})

@@ -23,7 +23,14 @@ WHERE id = $1;
 
 -- name: UpdateUser :one
 UPDATE users
-SET username = $1, password_hash = $2, updated_at = NOW()
+SET username = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, email, username, role, created_at, updated_at;
+
+-- name: UpdateUserPassword :one
+UPDATE users
+SET password_hash = $2, updated_at = NOW()
+WHERE id = $1
 RETURNING id, email, username, role, created_at, updated_at;
 
 -- name: DeleteUser :exec
