@@ -5,7 +5,11 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/users/90cfafe4-46bf-4d42-8d36-555eb9946412"
+  url: "{{baseUrl}}/api/users/:id"
+  params:
+    - name: id
+      value: 90cfafe4-46bf-4d42-8d36-555eb9946412
+      type: path
   auth:
     type: bearer
     token: "{{jwtToken}}"

@@ -130,12 +130,13 @@ func (q *Queries) ListIngredients(ctx context.Context, arg ListIngredientsParams
 
 const updateIngredient = `-- name: UpdateIngredient :one
 UPDATE ingredients
-SET name = $1, protein = $2, fat = $3, carbohydrates = $4, updated_at = NOW()
+SET name = $2, protein = $3, fat = $4, carbohydrates = $5, updated_at = NOW()
 WHERE id = $1
 RETURNING id, name, protein, fat, carbohydrates, created_at, updated_at
 `
 
 type UpdateIngredientParams struct {
+	ID            uuid.UUID
 	Name          string
 	Protein       float32
 	Fat           float32
@@ -144,6 +145,7 @@ type UpdateIngredientParams struct {
 
 func (q *Queries) UpdateIngredient(ctx context.Context, arg UpdateIngredientParams) (Ingredient, error) {
 	row := q.db.QueryRowContext(ctx, updateIngredient,
+		arg.ID,
 		arg.Name,
 		arg.Protein,
 		arg.Fat,

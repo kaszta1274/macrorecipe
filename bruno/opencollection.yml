@@ -19,3 +19,6 @@ extensions:
     ignore:
       - node_modules
       - .git
+    presets:
+      request:
+        type: http

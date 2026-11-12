@@ -1,0 +1,30 @@
+info:
+  name: Update Ingredient
+  type: http
+  seq: 1
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/admin/ingredients/:id"
+  params:
+    - name: id
+      value: 7970f68a-75e5-4b66-a00e-a3e34d498d2d
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "name": "White rice",
+        "protein": 6.5,
+        "fat": 0.5,
+        "carbohydrates": 79.2
+      }
+  auth:
+    type: bearer
+    token: "{{adminJwtToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

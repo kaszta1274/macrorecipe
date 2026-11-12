@@ -25,7 +25,7 @@ LIMIT $1 OFFSET $2;
 
 -- name: UpdateIngredient :one
 UPDATE ingredients
-SET name = $1, protein = $2, fat = $3, carbohydrates = $4, updated_at = NOW()
+SET name = $2, protein = $3, fat = $4, carbohydrates = $5, updated_at = NOW()
 WHERE id = $1
 RETURNING id, name, protein, fat, carbohydrates, created_at, updated_at;
 
