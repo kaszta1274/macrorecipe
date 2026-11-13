@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/auth"
 	"github.com/kaszta1274/macrorecipe/internal/database"
+	"github.com/lib/pq"
+	"github.com/lib/pq/pqerror"
 )
 
 type User struct {
@@ -88,6 +92,18 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: hashedPassword,
 		Role:         database.UserRoleUser,
 	})
+	if pqErr := pq.As(err, pqerror.UniqueViolation); pqErr != nil {
+		if pqErr.Constraint == "email" {
+			response.RespondWithError(w, http.StatusConflict, "email already registered", nil)
+			return
+		}
+		if pqErr.Constraint == "username" {
+			response.RespondWithError(w, http.StatusConflict, "username already taken", nil)
+			return
+		}
+		response.RespondWithError(w, http.StatusConflict, "user already exists", nil)
+		return
+	}
 	if err != nil {
 		response.RespondWithError(w, http.StatusInternalServerError, "could not create user", err)
 		return
@@ -118,8 +134,12 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.DB.GetUserByEmail(r.Context(), params.Email)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, http.StatusUnauthorized, "incorrect email or password", nil)
+		return
+	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusUnauthorized, "incorrect email or password", err)
+		response.RespondWithError(w, http.StatusInternalServerError, "could not process login", err)
 		return
 	}
 
@@ -150,13 +170,17 @@ func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 
 	userId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not parse id", err)
+		response.RespondWithError(w, http.StatusBadRequest, "invalid user id format", err)
 		return
 	}
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, http.StatusNotFound, "user not found", nil)
+		return
+	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusNotFound, "could not get user", err)
+		response.RespondWithError(w, http.StatusInternalServerError, "could not get user", err)
 		return
 	}
 
@@ -187,6 +211,10 @@ func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 		ID:       userId,
 		Username: params.Username,
 	})
+	if pqErr := pq.As(err, pqerror.UniqueViolation); pqErr != nil {
+		response.RespondWithError(w, http.StatusConflict, "user with this username exists", nil)
+		return
+	}
 	if err != nil {
 		response.RespondWithError(w, http.StatusInternalServerError, "could not update user", err)
 		return
@@ -223,8 +251,12 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, http.StatusNotFound, "user not found", nil)
+		return
+	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusNotFound, "could not get user", err)
+		response.RespondWithError(w, http.StatusInternalServerError, "could not get user", err)
 		return
 	}
 
@@ -284,8 +316,12 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, http.StatusNotFound, "user not found", nil)
+		return
+	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusNotFound, "could not get user", err)
+		response.RespondWithError(w, http.StatusInternalServerError, "could not get user", err)
 		return
 	}
 

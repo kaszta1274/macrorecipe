@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/database"
+	"github.com/lib/pq"
+	"github.com/lib/pq/pqerror"
 )
 
 type Ingredient struct {
@@ -68,6 +72,11 @@ func (h *IngredientHandler) CreateIngredient(w http.ResponseWriter, r *http.Requ
 		Fat:           *params.Fat,
 		Carbohydrates: *params.Carbohydrates,
 	})
+	pqErr := pq.As(err, pqerror.UniqueViolation)
+	if pqErr != nil {
+		response.RespondWithError(w, http.StatusConflict, "ingredient with this name exists", nil)
+		return
+	}
 	if err != nil {
 		response.RespondWithError(w, http.StatusInternalServerError, "could not create ingredient", err)
 		return
@@ -89,13 +98,17 @@ func (h *IngredientHandler) GetIngredientById(w http.ResponseWriter, r *http.Req
 
 	ingredientId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not parse id", err)
+		response.RespondWithError(w, http.StatusBadRequest, "invalid ingredient id format", err)
 		return
 	}
 
 	ingredient, err := h.DB.GetIngredientById(r.Context(), ingredientId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, http.StatusNotFound, "ingredient not found", nil)
+		return
+	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusNotFound, "could not get ingredient", err)
+		response.RespondWithError(w, http.StatusInternalServerError, "could not get ingredient", err)
 		return
 	}
 
@@ -114,22 +127,24 @@ func (h *IngredientHandler) ListIngredients(w http.ResponseWriter, r *http.Reque
 
 	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
 	if err != nil || limit < 1 {
-		limit = 1
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
 	}
 
 	offset := (page - 1) * limit
 
 	query := r.URL.Query().Get("query")
-	if query == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request", nil)
-		return
-	}
 
 	ingredients, err := h.DB.ListIngredients(r.Context(), database.ListIngredientsParams{
 		Limit:       int32(limit),
 		Offset:      int32(offset),
 		SearchQuery: query,
 	})
+	if err != nil {
+		response.RespondWithError(w, http.StatusInternalServerError, "could not list ingredients", err)
+		return
+	}
 
 	respondWithIngredientsJSON(w, ingredients)
 }
@@ -143,7 +158,7 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 
 	ingredientId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not parse ingredient id", err)
+		response.RespondWithError(w, http.StatusBadRequest, "invalid ingredient id format", err)
 		return
 	}
 
@@ -167,6 +182,15 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 		Fat:           *params.Fat,
 		Carbohydrates: *params.Carbohydrates,
 	})
+	pqErr := pq.As(err, pqerror.UniqueViolation)
+	if pqErr != nil {
+		response.RespondWithError(w, http.StatusConflict, "ingredient with this name exists", nil)
+		return
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, http.StatusNotFound, "ingredient not found", nil)
+		return
+	}
 	if err != nil {
 		response.RespondWithError(w, http.StatusInternalServerError, "could not update ingredient", err)
 		return
@@ -184,7 +208,7 @@ func (h *IngredientHandler) DeleteIngredient(w http.ResponseWriter, r *http.Requ
 
 	ingredientId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not parse ingredient id", err)
+		response.RespondWithError(w, http.StatusBadRequest, "invalid ingredient id format", err)
 		return
 	}
 

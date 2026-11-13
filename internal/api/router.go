@@ -44,7 +44,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 		r.Delete("/users", userHandler.DeleteUser)
 
 		r.Get("/ingredients/{id}", ingredientHandler.GetIngredientById)
-		r.Get(("/ingredients"), ingredientHandler.ListIngredients)
+		r.Get("/ingredients", ingredientHandler.ListIngredients)
 	})
 
 	r.Route("/api/admin", func(r chi.Router) {
