@@ -3,7 +3,10 @@ package response
 import (
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
+
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
@@ -18,17 +21,30 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Write(data)
 }
 
-func RespondWithError(w http.ResponseWriter, code int, msg string, err error) {
-	if err != nil {
-		log.Println(err)
-	}
+func RespondWithError(w http.ResponseWriter, r *http.Request, code int, msg string, err error) {
+	reqID := middleware.GetReqID(r.Context())
 	if code > 499 {
-		log.Printf("responding with 5XX error: %s", msg)
+		slog.ErrorContext(r.Context(), msg,
+			slog.String("request_id", reqID),
+			slog.Int("status", code),
+			slog.Any("error", err),
+		)
+	} else if err != nil {
+		slog.WarnContext(r.Context(), msg,
+			slog.String("request_id", reqID),
+			slog.Int("status", code),
+			slog.Any("error", err),
+		)
+	}
+
+	clientMsg := msg
+	if code > 499 {
+		clientMsg = "internal server error"
 	}
 	type errorResponse struct {
 		Error string `json:"error"`
 	}
 	RespondWithJSON(w, code, errorResponse{
-		Error: msg,
+		Error: clientMsg,
 	})
 }

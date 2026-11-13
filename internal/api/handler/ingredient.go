@@ -57,12 +57,12 @@ func (h *IngredientHandler) CreateIngredient(w http.ResponseWriter, r *http.Requ
 	params := IngredientCreateRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Name == "" || params.Protein == nil || params.Fat == nil || params.Carbohydrates == nil {
-		response.RespondWithError(w, http.StatusBadRequest, "name and all macro fields are required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "name and all macro fields are required", nil)
 		return
 	}
 
@@ -74,11 +74,11 @@ func (h *IngredientHandler) CreateIngredient(w http.ResponseWriter, r *http.Requ
 	})
 	pqErr := pq.As(err, pqerror.UniqueViolation)
 	if pqErr != nil {
-		response.RespondWithError(w, http.StatusConflict, "ingredient with this name exists", nil)
+		response.RespondWithError(w, r, http.StatusConflict, "ingredient with this name exists", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not create ingredient", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not create ingredient", err)
 		return
 	}
 
@@ -92,23 +92,23 @@ func (h *IngredientHandler) CreateIngredient(w http.ResponseWriter, r *http.Requ
 func (h *IngredientHandler) GetIngredientById(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
 		return
 	}
 
 	ingredientId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid ingredient id format", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid ingredient id format", err)
 		return
 	}
 
 	ingredient, err := h.DB.GetIngredientById(r.Context(), ingredientId)
 	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, http.StatusNotFound, "ingredient not found", nil)
+		response.RespondWithError(w, r, http.StatusNotFound, "ingredient not found", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not get ingredient", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get ingredient", err)
 		return
 	}
 
@@ -142,7 +142,7 @@ func (h *IngredientHandler) ListIngredients(w http.ResponseWriter, r *http.Reque
 		SearchQuery: query,
 	})
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not list ingredients", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list ingredients", err)
 		return
 	}
 
@@ -152,13 +152,13 @@ func (h *IngredientHandler) ListIngredients(w http.ResponseWriter, r *http.Reque
 func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
 		return
 	}
 
 	ingredientId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid ingredient id format", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid ingredient id format", err)
 		return
 	}
 
@@ -166,12 +166,12 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 	params := IngredientUpdateRequest{}
 	err = decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Name == "" || params.Protein == nil || params.Fat == nil || params.Carbohydrates == nil {
-		response.RespondWithError(w, http.StatusBadRequest, "name and all macro fields are required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "name and all macro fields are required", nil)
 		return
 	}
 
@@ -184,15 +184,15 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 	})
 	pqErr := pq.As(err, pqerror.UniqueViolation)
 	if pqErr != nil {
-		response.RespondWithError(w, http.StatusConflict, "ingredient with this name exists", nil)
+		response.RespondWithError(w, r, http.StatusConflict, "ingredient with this name exists", nil)
 		return
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, http.StatusNotFound, "ingredient not found", nil)
+		response.RespondWithError(w, r, http.StatusNotFound, "ingredient not found", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not update ingredient", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not update ingredient", err)
 		return
 	}
 
@@ -202,19 +202,19 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 func (h *IngredientHandler) DeleteIngredient(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
 		return
 	}
 
 	ingredientId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid ingredient id format", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid ingredient id format", err)
 		return
 	}
 
 	err = h.DB.DeleteIngredient(r.Context(), ingredientId)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not delete ingredient", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not delete ingredient", err)
 		return
 	}
 

@@ -71,18 +71,18 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	params := UserCreateRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Password == "" || params.Email == "" || params.Username == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "email, username and password are required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "email, username and password are required", nil)
 		return
 	}
 
 	hashedPassword, err := auth.HashPassword(params.Password)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not hash password", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not hash password", err)
 		return
 	}
 
@@ -94,18 +94,18 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	})
 	if pqErr := pq.As(err, pqerror.UniqueViolation); pqErr != nil {
 		if pqErr.Constraint == "email" {
-			response.RespondWithError(w, http.StatusConflict, "email already registered", nil)
+			response.RespondWithError(w, r, http.StatusConflict, "email already registered", nil)
 			return
 		}
 		if pqErr.Constraint == "username" {
-			response.RespondWithError(w, http.StatusConflict, "username already taken", nil)
+			response.RespondWithError(w, r, http.StatusConflict, "username already taken", nil)
 			return
 		}
-		response.RespondWithError(w, http.StatusConflict, "user already exists", nil)
+		response.RespondWithError(w, r, http.StatusConflict, "user already exists", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not create user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not create user", err)
 		return
 	}
 
@@ -124,34 +124,34 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	params := UserLoginRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Password == "" || params.Email == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "email and password are required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "email and password are required", nil)
 		return
 	}
 
 	user, err := h.DB.GetUserByEmail(r.Context(), params.Email)
 	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, http.StatusUnauthorized, "incorrect email or password", nil)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "incorrect email or password", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not process login", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not process login", err)
 		return
 	}
 
 	match, err := auth.VerifyPasswordHash(params.Password, user.PasswordHash)
 	if err != nil || !match {
-		response.RespondWithError(w, http.StatusUnauthorized, "incorrect email or password", err)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "incorrect email or password", err)
 		return
 	}
 
 	accessToken, err := auth.MakeJWTWithRole(user.ID, user.Role, h.TokenSecret, time.Hour)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not create access token", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not create access token", err)
 		return
 	}
 
@@ -164,23 +164,23 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
 		return
 	}
 
 	userId, err := uuid.Parse(id)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid user id format", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid user id format", err)
 		return
 	}
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
 	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, http.StatusNotFound, "user not found", nil)
+		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not get user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get user", err)
 		return
 	}
 
@@ -192,18 +192,18 @@ func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 	params := UserUpdateRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Username == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "username is required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "username is required", nil)
 		return
 	}
 
 	userId, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
-		response.RespondWithError(w, http.StatusUnauthorized, "could not get user id", nil)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
 		return
 	}
 
@@ -212,11 +212,11 @@ func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 		Username: params.Username,
 	})
 	if pqErr := pq.As(err, pqerror.UniqueViolation); pqErr != nil {
-		response.RespondWithError(w, http.StatusConflict, "user with this username exists", nil)
+		response.RespondWithError(w, r, http.StatusConflict, "user with this username exists", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not update user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not update user", err)
 		return
 	}
 
@@ -235,44 +235,44 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	params := UserUpdatePasswordRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Password == "" || params.NewPassword == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "current password and new password are required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "current password and new password are required", nil)
 		return
 	}
 
 	userId, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
-		response.RespondWithError(w, http.StatusUnauthorized, "could not get user id", nil)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
 		return
 	}
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
 	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, http.StatusNotFound, "user not found", nil)
+		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not get user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get user", err)
 		return
 	}
 
 	match, err := auth.VerifyPasswordHash(params.Password, user.PasswordHash)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not verify password", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not verify password", err)
 		return
 	}
 	if !match {
-		response.RespondWithError(w, http.StatusUnauthorized, "invalid credentials", nil)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "invalid credentials", nil)
 		return
 	}
 
 	hashedNewPassword, err := auth.HashPassword(params.NewPassword)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not hash password", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not hash password", err)
 		return
 	}
 
@@ -281,7 +281,7 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: hashedNewPassword,
 	})
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not update user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not update user", err)
 		return
 	}
 
@@ -300,44 +300,44 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	params := UserDeleteRequest{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		response.RespondWithError(w, http.StatusBadRequest, "invalid request payload", err)
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
 		return
 	}
 
 	if params.Password == "" {
-		response.RespondWithError(w, http.StatusBadRequest, "password is required", nil)
+		response.RespondWithError(w, r, http.StatusBadRequest, "password is required", nil)
 		return
 	}
 
 	userId, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
-		response.RespondWithError(w, http.StatusUnauthorized, "could not get user id", nil)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
 		return
 	}
 
 	user, err := h.DB.GetUserById(r.Context(), userId)
 	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, http.StatusNotFound, "user not found", nil)
+		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
 		return
 	}
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not get user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get user", err)
 		return
 	}
 
 	match, err := auth.VerifyPasswordHash(params.Password, user.PasswordHash)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not verify password", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not verify password", err)
 		return
 	}
 	if !match {
-		response.RespondWithError(w, http.StatusUnauthorized, "invalid credentials", nil)
+		response.RespondWithError(w, r, http.StatusUnauthorized, "invalid credentials", nil)
 		return
 	}
 
 	err = h.DB.DeleteUser(r.Context(), userId)
 	if err != nil {
-		response.RespondWithError(w, http.StatusInternalServerError, "could not delete user", err)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not delete user", err)
 		return
 	}
 

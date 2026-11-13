@@ -13,13 +13,13 @@ func AuthMiddleware(tokenSecret string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tokenString, err := auth.GetBearerToken(r.Header)
 			if err != nil {
-				response.RespondWithError(w, http.StatusUnauthorized, "missing or malformed authorization header", err)
+				response.RespondWithError(w, r, http.StatusUnauthorized, "missing or malformed authorization header", err)
 				return
 			}
 
 			userId, role, err := auth.ValidateJWT(tokenString, tokenSecret)
 			if err != nil {
-				response.RespondWithError(w, http.StatusUnauthorized, "invalid jwt", err)
+				response.RespondWithError(w, r, http.StatusUnauthorized, "invalid jwt", err)
 				return
 			}
 
@@ -36,7 +36,7 @@ func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authCtx, ok := auth.FromContext(r.Context())
 		if !ok || authCtx.Role != database.UserRoleAdmin {
-			response.RespondWithError(w, http.StatusForbidden, "requires admin", nil)
+			response.RespondWithError(w, r, http.StatusForbidden, "requires admin", nil)
 			return
 		}
 		next.ServeHTTP(w, r)
