@@ -2,13 +2,13 @@ package handler
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/kaszta1274/macrorecipe/internal/api/request"
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/auth"
 	"github.com/kaszta1274/macrorecipe/internal/database"
@@ -26,27 +26,27 @@ type User struct {
 }
 
 type UserCreateRequest struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
+	Email    string `json:"email" validate:"required,email"`
+	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`
+	Password string `json:"password" validate:"required,min=8,max=128"`
 }
 
 type UserLoginRequest struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Email    string `json:"email" validate:"required"`
+	Password string `json:"password" validate:"required"`
 }
 
 type UserUpdateRequest struct {
-	Username string `json:"username"`
+	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`
 }
 
 type UserUpdatePasswordRequest struct {
-	Password    string `json:"password"`
-	NewPassword string `json:"new_password"`
+	Password    string `json:"password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required"`
 }
 
 type UserDeleteRequest struct {
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required"`
 }
 
 type UserLoginResponse struct {
@@ -67,16 +67,9 @@ func NewUserHandler(db *database.Queries, tokenSecret string) *UserHandler {
 }
 
 func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	params := UserCreateRequest{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Password == "" || params.Email == "" || params.Username == "" {
-		response.RespondWithError(w, r, http.StatusBadRequest, "email, username and password are required", nil)
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
@@ -120,16 +113,9 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	params := UserLoginRequest{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Password == "" || params.Email == "" {
-		response.RespondWithError(w, r, http.StatusBadRequest, "email and password are required", nil)
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
@@ -188,16 +174,9 @@ func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	params := UserUpdateRequest{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Username == "" {
-		response.RespondWithError(w, r, http.StatusBadRequest, "username is required", nil)
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
@@ -231,16 +210,9 @@ func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	params := UserUpdatePasswordRequest{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Password == "" || params.NewPassword == "" {
-		response.RespondWithError(w, r, http.StatusBadRequest, "current password and new password are required", nil)
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
@@ -296,16 +268,9 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	params := UserDeleteRequest{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Password == "" {
-		response.RespondWithError(w, r, http.StatusBadRequest, "password is required", nil)
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 

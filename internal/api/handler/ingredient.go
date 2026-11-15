@@ -2,7 +2,6 @@ package handler
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/kaszta1274/macrorecipe/internal/api/request"
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/database"
 	"github.com/lib/pq"
@@ -26,18 +26,11 @@ type Ingredient struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-type IngredientCreateRequest struct {
-	Name          string   `json:"name"`
-	Protein       *float32 `json:"protein"`
-	Fat           *float32 `json:"fat"`
-	Carbohydrates *float32 `json:"carbohydrates"`
-}
-
-type IngredientUpdateRequest struct {
-	Name          string   `json:"name"`
-	Protein       *float32 `json:"protein"`
-	Fat           *float32 `json:"fat"`
-	Carbohydrates *float32 `json:"carbohydrates"`
+type IngredientRequest struct {
+	Name          string  `json:"name" validate:"required,min=2,max=100"`
+	Protein       float32 `json:"protein" validate:"gte=0,lte=100"`
+	Fat           float32 `json:"fat" validate:"gte=0,lte=100"`
+	Carbohydrates float32 `json:"carbohydrates" validate:"gte=0,lte=100"`
 }
 
 type IngredientHandler struct {
@@ -53,24 +46,17 @@ func NewIngredientHandler(db *database.Queries, tokenSecret string) *IngredientH
 }
 
 func (h *IngredientHandler) CreateIngredient(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	params := IngredientCreateRequest{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Name == "" || params.Protein == nil || params.Fat == nil || params.Carbohydrates == nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "name and all macro fields are required", nil)
+	params := IngredientRequest{}
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
 	ingredient, err := h.DB.CreateIngredient(r.Context(), database.CreateIngredientParams{
 		Name:          params.Name,
-		Protein:       *params.Protein,
-		Fat:           *params.Fat,
-		Carbohydrates: *params.Carbohydrates,
+		Protein:       params.Protein,
+		Fat:           params.Fat,
+		Carbohydrates: params.Carbohydrates,
 	})
 	pqErr := pq.As(err, pqerror.UniqueViolation)
 	if pqErr != nil {
@@ -162,25 +148,18 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	decoder := json.NewDecoder(r.Body)
-	params := IngredientUpdateRequest{}
-	err = decoder.Decode(&params)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request payload", err)
-		return
-	}
-
-	if params.Name == "" || params.Protein == nil || params.Fat == nil || params.Carbohydrates == nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "name and all macro fields are required", nil)
+	params := IngredientRequest{}
+	if err := request.DecodeJSON(w, r, &params); err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
 	updatedIngredient, err := h.DB.UpdateIngredient(r.Context(), database.UpdateIngredientParams{
 		ID:            ingredientId,
 		Name:          params.Name,
-		Protein:       *params.Protein,
-		Fat:           *params.Fat,
-		Carbohydrates: *params.Carbohydrates,
+		Protein:       params.Protein,
+		Fat:           params.Fat,
+		Carbohydrates: params.Carbohydrates,
 	})
 	pqErr := pq.As(err, pqerror.UniqueViolation)
 	if pqErr != nil {

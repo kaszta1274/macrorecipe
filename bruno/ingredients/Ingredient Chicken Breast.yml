@@ -13,7 +13,7 @@ http:
         "name": "Chicken breast",
         "protein": 22.5,
         "fat": 2.6,
-        "carbohydrates": 0
+        "carbohydrates": 0.0
       }
   auth:
     type: bearer
