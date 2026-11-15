@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -79,8 +80,10 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	email := strings.ToLower(strings.TrimSpace(params.Email))
+
 	user, err := h.DB.CreateUser(r.Context(), database.CreateUserParams{
-		Email:        params.Email,
+		Email:        email,
 		Username:     params.Username,
 		PasswordHash: hashedPassword,
 		Role:         database.UserRoleUser,
@@ -119,7 +122,9 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.DB.GetUserByEmail(r.Context(), params.Email)
+	email := strings.ToLower(strings.TrimSpace(params.Email))
+
+	user, err := h.DB.GetUserByEmail(r.Context(), email)
 	if errors.Is(err, sql.ErrNoRows) {
 		response.RespondWithError(w, r, http.StatusUnauthorized, "incorrect email or password", nil)
 		return
