@@ -64,6 +64,25 @@ type Ingredient struct {
 	UpdatedAt     time.Time
 }
 
+type Recipe struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Name         string
+	Description  string
+	Instructions string
+	Portions     int16
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type RecipeIngredient struct {
+	RecipeID     uuid.UUID
+	IngredientID uuid.UUID
+	Amount       float32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 type User struct {
 	ID           uuid.UUID
 	Email        string
