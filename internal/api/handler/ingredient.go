@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -106,27 +105,17 @@ func (h *IngredientHandler) GetIngredientById(w http.ResponseWriter, r *http.Req
 }
 
 func (h *IngredientHandler) ListIngredients(w http.ResponseWriter, r *http.Request) {
-	page, err := strconv.Atoi(r.URL.Query().Get("page"))
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
-	if err != nil || limit < 1 {
-		limit = 10
-	} else if limit > 100 {
-		limit = 100
-	}
-
-	offset := (page - 1) * limit
-
-	query := r.URL.Query().Get("query")
+	limit, offset, query := request.ParsePagination(r)
 
 	ingredients, err := h.DB.ListIngredients(r.Context(), database.ListIngredientsParams{
 		Limit:       int32(limit),
 		Offset:      int32(offset),
 		SearchQuery: query,
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "ingredients not found", nil)
+		return
+	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list ingredients", err)
 		return
@@ -216,15 +205,7 @@ func respondWithIngredientsJSON(w http.ResponseWriter, ingredients []database.In
 	resp := []Ingredient{}
 
 	for _, ingredient := range ingredients {
-		resp = append(resp, Ingredient{
-			ID:            ingredient.ID,
-			Name:          ingredient.Name,
-			Protein:       ingredient.Protein,
-			Fat:           ingredient.Fat,
-			Carbohydrates: ingredient.Carbohydrates,
-			CreatedAt:     ingredient.CreatedAt,
-			UpdatedAt:     ingredient.UpdatedAt,
-		})
+		resp = append(resp, databaseIngredientToResponseIngredient(ingredient))
 	}
 	response.RespondWithJSON(w, http.StatusOK, resp)
 }
