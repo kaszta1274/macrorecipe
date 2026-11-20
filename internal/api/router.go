@@ -25,7 +25,8 @@ func (cfg *ApiConfig) Router() http.Handler {
 
 	userHandler := handler.NewUserHandler(cfg.DB, cfg.TokenSecret)
 	ingredientHandler := handler.NewIngredientHandler(cfg.DB, cfg.TokenSecret)
-	recipeHandler := handler.NewRecipeHandler(cfg.DB, cfg.TokenSecret)
+	recipeHandler := handler.NewRecipeHandler(cfg.DB)
+	recipeIngredientHandler := handler.NewRecipeIngredientHandler(cfg.DB)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
@@ -52,6 +53,13 @@ func (cfg *ApiConfig) Router() http.Handler {
 		r.Post("/recipes", recipeHandler.CreateRecipe)
 		r.Get("/recipes/{id}", recipeHandler.GetRecipeById)
 		r.Get("/recipes", recipeHandler.ListRecipesByName)
+		r.Put("/recipes/{id}", recipeHandler.UpdateRecipe)
+		r.Delete("/recipes/{id}", recipeHandler.DeleteRecipe)
+
+		r.Post("/recipes/{recipe_id}/ingredients", recipeIngredientHandler.CreateRecipeIngredient)
+		r.Get("/recipes/{recipe_id}/ingredients", recipeIngredientHandler.ListRecipeIngredientsByRecipeId)
+		r.Put("/recipes/{recipe_id}/ingredients/{ingredient_id}", recipeIngredientHandler.UpdateRecipeIngredient)
+		r.Delete("/recipes/{recipe_id}/ingredients/{ingredient_id}", recipeIngredientHandler.DeleteRecipeIngredient)
 	})
 
 	r.Route("/api/admin", func(r chi.Router) {

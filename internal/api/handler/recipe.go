@@ -33,14 +33,12 @@ type RecipeRequest struct {
 }
 
 type RecipeHandler struct {
-	DB          *database.Queries
-	TokenSecret string
+	DB *database.Queries
 }
 
-func NewRecipeHandler(db *database.Queries, tokenSecret string) *RecipeHandler {
+func NewRecipeHandler(db *database.Queries) *RecipeHandler {
 	return &RecipeHandler{
-		DB:          db,
-		TokenSecret: tokenSecret,
+		DB: db,
 	}
 }
 
@@ -106,10 +104,6 @@ func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request
 		Offset:      int32(offset),
 		SearchQuery: query,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, r, http.StatusNotFound, "recipes not found", nil)
-		return
-	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
 		return
@@ -133,10 +127,6 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 		Offset:      int32(offset),
 		SearchQuery: query,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, r, http.StatusNotFound, "recipes not found", nil)
-		return
-	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
 		return
@@ -146,7 +136,7 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "user_id")
+	id := chi.URLParam(r, "id")
 	if id == "" {
 		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
 		return
@@ -166,10 +156,6 @@ func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Reque
 		Offset:      int32(offset),
 		SearchQuery: query,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, r, http.StatusNotFound, "recipes not found", nil)
-		return
-	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
 		return
@@ -224,6 +210,10 @@ func (h *RecipeHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request) {
 		Instructions: params.Instructions,
 		Portions:     int16(params.Portions),
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "recipe not found", nil)
+		return
+	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not update recipe", err)
 		return
