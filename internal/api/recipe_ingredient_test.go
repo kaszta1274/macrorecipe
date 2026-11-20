@@ -53,15 +53,61 @@ func TestRecipeIngredients(t *testing.T) {
 		wantStatus int
 		check      func(*testing.T, *httptest.ResponseRecorder)
 	}{
-		{"alice add", http.MethodPost, basePath, aliceToken, handler.RecipeIngredientCreateRequest{IngredientID: eggs.ID, Amount: 100}, http.StatusCreated, assertRecipeIngredient(aliceRecipe.ID, eggs.ID, 100)},
-		{"alice add duplicate", http.MethodPost, basePath, aliceToken, handler.RecipeIngredientCreateRequest{IngredientID: chicken.ID, Amount: 150}, http.StatusConflict, nil},
-		{"bob add forbidden", http.MethodPost, basePath, bobToken, handler.RecipeIngredientCreateRequest{IngredientID: eggs.ID, Amount: 100}, http.StatusForbidden, nil},
-		{"admin add", http.MethodPost, basePath, adminToken, handler.RecipeIngredientCreateRequest{IngredientID: eggs.ID, Amount: 100}, http.StatusCreated, assertRecipeIngredient(aliceRecipe.ID, eggs.ID, 100)},
-		{"alice update", http.MethodPut, basePath + "/" + chicken.ID.String(), aliceToken, handler.RecipeIngredientUpdateRequest{Amount: 250}, http.StatusOK, assertRecipeIngredient(aliceRecipe.ID, chicken.ID, 250)},
-		{"alice update missing", http.MethodPut, basePath + "/" + salmon.ID.String(), aliceToken, handler.RecipeIngredientUpdateRequest{Amount: 100}, http.StatusNotFound, nil},
-		{"bob update forbidden", http.MethodPut, basePath + "/" + chicken.ID.String(), bobToken, handler.RecipeIngredientUpdateRequest{Amount: 250}, http.StatusForbidden, nil},
-		{"bob delete forbidden", http.MethodDelete, basePath + "/" + chicken.ID.String(), bobToken, nil, http.StatusForbidden, nil},
-		{"alice delete", http.MethodDelete, basePath + "/" + chicken.ID.String(), aliceToken, nil, http.StatusNoContent, nil},
+		{
+			"alice add",
+			http.MethodPost, basePath, aliceToken,
+			handler.RecipeIngredientCreateRequest{IngredientID: eggs.ID, Amount: 100},
+			http.StatusCreated,
+			assertRecipeIngredient(aliceRecipe.ID, eggs.ID, 100),
+		},
+		{
+			"alice add duplicate",
+			http.MethodPost, basePath, aliceToken,
+			handler.RecipeIngredientCreateRequest{IngredientID: chicken.ID, Amount: 150},
+			http.StatusConflict, nil,
+		},
+		{
+			"bob add forbidden",
+			http.MethodPost, basePath, bobToken,
+			handler.RecipeIngredientCreateRequest{IngredientID: eggs.ID, Amount: 100},
+			http.StatusForbidden, nil,
+		},
+		{
+			"admin add",
+			http.MethodPost, basePath, adminToken,
+			handler.RecipeIngredientCreateRequest{IngredientID: eggs.ID, Amount: 100},
+			http.StatusCreated,
+			assertRecipeIngredient(aliceRecipe.ID, eggs.ID, 100),
+		},
+		{
+			"alice update",
+			http.MethodPut, basePath + "/" + chicken.ID.String(), aliceToken,
+			handler.RecipeIngredientUpdateRequest{Amount: 250},
+			http.StatusOK,
+			assertRecipeIngredient(aliceRecipe.ID, chicken.ID, 250),
+		},
+		{
+			"alice update missing",
+			http.MethodPut, basePath + "/" + salmon.ID.String(), aliceToken,
+			handler.RecipeIngredientUpdateRequest{Amount: 100},
+			http.StatusNotFound, nil,
+		},
+		{
+			"bob update forbidden",
+			http.MethodPut, basePath + "/" + chicken.ID.String(), bobToken,
+			handler.RecipeIngredientUpdateRequest{Amount: 250},
+			http.StatusForbidden, nil,
+		},
+		{
+			"bob delete forbidden",
+			http.MethodDelete, basePath + "/" + chicken.ID.String(), bobToken, nil,
+			http.StatusForbidden, nil,
+		},
+		{
+			"alice delete",
+			http.MethodDelete, basePath + "/" + chicken.ID.String(), aliceToken, nil,
+			http.StatusNoContent, nil,
+		},
 	}
 
 	for _, tc := range cases {

@@ -36,25 +36,66 @@ func TestRecipes(t *testing.T) {
 		wantStatus int
 		check      func(*testing.T, *httptest.ResponseRecorder)
 	}{
-		{"alice create", http.MethodPost, "/api/recipes", aliceToken, validRecipe, http.StatusCreated, assertRecipe(uuid.Nil, alice.ID, validRecipe.Name, validRecipe.Portions)},
-		{"alice get", http.MethodGet, "/api/recipes/" + aliceRecipe.ID.String(), aliceToken, nil, http.StatusOK, assertRecipe(aliceRecipe.ID, alice.ID, aliceRecipe.Name, int(aliceRecipe.Portions))},
-		{"get missing", http.MethodGet, "/api/recipes/" + uuid.NewString(), aliceToken, nil, http.StatusNotFound, nil},
-		{"list by user id", http.MethodGet, "/api/users/" + alice.ID.String() + "/recipes", aliceToken, nil, http.StatusOK, func(t *testing.T, rec *httptest.ResponseRecorder) {
-			got := decodeJSON[[]handler.Recipe](t, rec)
-			if len(got) != 2 {
-				t.Fatalf("recipe count = %d, want 2", len(got))
-			}
-			for _, r := range got {
-				if r.UserID != alice.ID {
-					t.Fatalf("unexpected user_id = %s, want %s", r.UserID, alice.ID)
+		{
+			"alice create",
+			http.MethodPost, "/api/recipes", aliceToken, validRecipe,
+			http.StatusCreated,
+			assertRecipe(uuid.Nil, alice.ID, validRecipe.Name, validRecipe.Portions),
+		},
+		{
+			"alice get",
+			http.MethodGet, "/api/recipes/" + aliceRecipe.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			assertRecipe(aliceRecipe.ID, alice.ID, aliceRecipe.Name, int(aliceRecipe.Portions)),
+		},
+		{
+			"get missing",
+			http.MethodGet, "/api/recipes/" + uuid.NewString(), aliceToken, nil,
+			http.StatusNotFound, nil,
+		},
+		{
+			"list by user id",
+			http.MethodGet, "/api/users/" + alice.ID.String() + "/recipes", aliceToken, nil,
+			http.StatusOK,
+			func(t *testing.T, rec *httptest.ResponseRecorder) {
+				got := decodeJSON[[]handler.Recipe](t, rec)
+				if len(got) != 2 {
+					t.Fatalf("recipe count = %d, want 2", len(got))
 				}
-			}
-		}},
-		{"alice update own", http.MethodPut, "/api/recipes/" + aliceRecipe.ID.String(), aliceToken, validRecipe, http.StatusOK, assertRecipe(aliceRecipe.ID, alice.ID, validRecipe.Name, validRecipe.Portions)},
-		{"bob update forbidden", http.MethodPut, "/api/recipes/" + aliceRecipe.ID.String(), bobToken, validRecipe, http.StatusForbidden, nil},
-		{"bob delete forbidden", http.MethodDelete, "/api/recipes/" + aliceRecipe.ID.String(), bobToken, nil, http.StatusForbidden, nil},
-		{"admin update", http.MethodPut, "/api/recipes/" + aliceRecipe.ID.String(), adminToken, validRecipe, http.StatusOK, assertRecipe(aliceRecipe.ID, alice.ID, validRecipe.Name, validRecipe.Portions)},
-		{"admin delete", http.MethodDelete, "/api/recipes/" + aliceRecipe.ID.String(), adminToken, nil, http.StatusNoContent, nil},
+				for _, r := range got {
+					if r.UserID != alice.ID {
+						t.Fatalf("unexpected user_id = %s, want %s", r.UserID, alice.ID)
+					}
+				}
+			},
+		},
+		{
+			"alice update own",
+			http.MethodPut, "/api/recipes/" + aliceRecipe.ID.String(), aliceToken, validRecipe,
+			http.StatusOK,
+			assertRecipe(aliceRecipe.ID, alice.ID, validRecipe.Name, validRecipe.Portions),
+		},
+		{
+			"bob update forbidden",
+			http.MethodPut, "/api/recipes/" + aliceRecipe.ID.String(), bobToken, validRecipe,
+			http.StatusForbidden, nil,
+		},
+		{
+			"bob delete forbidden",
+			http.MethodDelete, "/api/recipes/" + aliceRecipe.ID.String(), bobToken, nil,
+			http.StatusForbidden, nil,
+		},
+		{
+			"admin update",
+			http.MethodPut, "/api/recipes/" + aliceRecipe.ID.String(), adminToken, validRecipe,
+			http.StatusOK,
+			assertRecipe(aliceRecipe.ID, alice.ID, validRecipe.Name, validRecipe.Portions),
+		},
+		{
+			"admin delete",
+			http.MethodDelete, "/api/recipes/" + aliceRecipe.ID.String(), adminToken, nil,
+			http.StatusNoContent, nil,
+		},
 	}
 
 	for _, tc := range cases {
