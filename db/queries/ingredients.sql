@@ -16,6 +16,11 @@ SELECT id, name, protein, fat, carbohydrates, created_at, updated_at
 FROM ingredients
 WHERE id = $1;
 
+-- name: GetIngredientByName :one
+SELECT id, name, protein, fat, carbohydrates, created_at, updated_at
+FROM ingredients
+WHERE name = $1;
+
 -- name: ListIngredients :many
 SELECT id, name, protein, fat, carbohydrates, created_at, updated_at
 FROM ingredients

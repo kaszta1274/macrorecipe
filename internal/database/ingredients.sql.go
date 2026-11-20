@@ -83,6 +83,27 @@ func (q *Queries) GetIngredientById(ctx context.Context, id uuid.UUID) (Ingredie
 	return i, err
 }
 
+const getIngredientByName = `-- name: GetIngredientByName :one
+SELECT id, name, protein, fat, carbohydrates, created_at, updated_at
+FROM ingredients
+WHERE name = $1
+`
+
+func (q *Queries) GetIngredientByName(ctx context.Context, name string) (Ingredient, error) {
+	row := q.db.QueryRowContext(ctx, getIngredientByName, name)
+	var i Ingredient
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Protein,
+		&i.Fat,
+		&i.Carbohydrates,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listIngredients = `-- name: ListIngredients :many
 SELECT id, name, protein, fat, carbohydrates, created_at, updated_at
 FROM ingredients
