@@ -89,11 +89,11 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Role:         database.UserRoleUser,
 	})
 	if pqErr := pq.As(err, pqerror.UniqueViolation); pqErr != nil {
-		if pqErr.Constraint == "email" {
+		if pqErr.Constraint == "users_email_key" {
 			response.RespondWithError(w, r, http.StatusConflict, "email already registered", nil)
 			return
 		}
-		if pqErr.Constraint == "username" {
+		if pqErr.Constraint == "users_username_key" {
 			response.RespondWithError(w, r, http.StatusConflict, "username already taken", nil)
 			return
 		}
