@@ -64,6 +64,12 @@ type Ingredient struct {
 	UpdatedAt     time.Time
 }
 
+type Like struct {
+	UserID    uuid.UUID
+	RecipeID  uuid.UUID
+	CreatedAt time.Time
+}
+
 type Recipe struct {
 	ID           uuid.UUID
 	UserID       uuid.UUID
