@@ -18,6 +18,7 @@ type SeedData struct {
 	Ingredients map[string]database.Ingredient
 	Recipes     []database.Recipe
 	Likes       []database.Like
+	Comments    []database.Comment
 }
 
 func SeedBase(ctx context.Context, db *database.Queries, adminEmail, adminPassword string) (SeedData, error) {
@@ -135,6 +136,55 @@ func SeedTestData(ctx context.Context, db *database.Queries, adminEmail, adminPa
 			return SeedData{}, fmt.Errorf("seed like (%q, %q): %w", user.Email, recipe.Name, err)
 		}
 		data.Likes = append(data.Likes, like)
+	}
+
+	// shortcut: assumes seeded recipes have <=100 comments; add a dedicated query if that grows.
+	type commentKey struct {
+		userID uuid.UUID
+		body   string
+	}
+	existingCommentsByRecipe := make(map[uuid.UUID]map[commentKey]database.Comment, len(data.Recipes))
+	for _, recipe := range data.Recipes {
+		comments, err := db.ListCommentsByRecipeId(ctx, database.ListCommentsByRecipeIdParams{
+			RecipeID: recipe.ID,
+			Limit:    100,
+			Offset:   0,
+		})
+		if err != nil {
+			return SeedData{}, fmt.Errorf("list comments for %q: %w", recipe.Name, err)
+		}
+		byKey := make(map[commentKey]database.Comment, len(comments))
+		for _, c := range comments {
+			byKey[commentKey{userID: c.UserID, body: c.Body}] = database.Comment{
+				ID:        c.ID,
+				UserID:    c.UserID,
+				RecipeID:  c.RecipeID,
+				Body:      c.Body,
+				CreatedAt: c.CreatedAt,
+				UpdatedAt: c.UpdatedAt,
+			}
+		}
+		existingCommentsByRecipe[recipe.ID] = byKey
+	}
+
+	data.Comments = make([]database.Comment, 0, len(testComments))
+	for _, sc := range testComments {
+		user := data.Users[sc.userIndex]
+		recipe := data.Recipes[sc.recipeIndex]
+		key := commentKey{userID: user.ID, body: sc.body}
+		comment, exists := existingCommentsByRecipe[recipe.ID][key]
+		if !exists {
+			comment, err = db.CreateComment(ctx, database.CreateCommentParams{
+				UserID:   user.ID,
+				RecipeID: recipe.ID,
+				Body:     sc.body,
+			})
+			if err != nil {
+				return SeedData{}, fmt.Errorf("seed comment (%q, %q): %w", user.Email, recipe.Name, err)
+			}
+			existingCommentsByRecipe[recipe.ID][key] = comment
+		}
+		data.Comments = append(data.Comments, comment)
 	}
 
 	return data, nil

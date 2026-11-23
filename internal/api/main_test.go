@@ -195,5 +195,11 @@ func TestSeederIdempotency(t *testing.T) {
 		if len(again.Recipes) != len(testSeed.Recipes) || again.Recipes[0].ID != testSeed.Recipes[0].ID {
 			t.Fatalf("recipes not idempotent: got %+v", again.Recipes)
 		}
+		if len(again.Likes) != len(testSeed.Likes) || again.Likes[0].RecipeID != testSeed.Likes[0].RecipeID {
+			t.Fatalf("likes not idempotent: got %+v", again.Likes)
+		}
+		if len(again.Comments) != len(testSeed.Comments) || again.Comments[0].ID != testSeed.Comments[0].ID {
+			t.Fatalf("comments not idempotent: got %+v", again.Comments)
+		}
 	})
 }
