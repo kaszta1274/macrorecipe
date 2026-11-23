@@ -28,6 +28,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 	recipeHandler := handler.NewRecipeHandler(cfg.DB)
 	recipeIngredientHandler := handler.NewRecipeIngredientHandler(cfg.DB)
 	likeHandler := handler.NewLikeHandler(cfg.DB)
+	commentHandler := handler.NewCommentHandler(cfg.DB)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
@@ -65,6 +66,11 @@ func (cfg *ApiConfig) Router() http.Handler {
 
 		r.Post("/recipes/{recipe_id}/likes", likeHandler.CreateLike)
 		r.Delete("/recipes/{recipe_id}/likes", likeHandler.DeleteLike)
+
+		r.Post("/recipes/{recipe_id}/comments", commentHandler.CreateComment)
+		r.Get("/recipes/{recipe_id}/comments", commentHandler.ListCommentsByRecipeId)
+		r.Put("/comments/{comment_id}", commentHandler.UpdateComment)
+		r.Delete("/comments/{comment_id}", commentHandler.DeleteComment)
 	})
 
 	r.Route("/api/admin", func(r chi.Router) {
