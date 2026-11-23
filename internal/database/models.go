@@ -54,6 +54,15 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
+type Comment struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	RecipeID  uuid.UUID
+	Body      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Ingredient struct {
 	ID            uuid.UUID
 	Name          string
