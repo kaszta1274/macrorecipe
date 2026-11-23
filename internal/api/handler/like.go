@@ -81,7 +81,7 @@ func (h *LikeHandler) CreateLike(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) {
-	userId, err := uuid.Parse(chi.URLParam(r, "user_id"))
+	userId, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, "invalid user id format", err)
 		return
@@ -94,10 +94,6 @@ func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) 
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	})
-	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, r, http.StatusNotFound, "likes not found", nil)
-		return
-	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get likes", err)
 		return

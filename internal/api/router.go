@@ -43,6 +43,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 
 		r.Get("/users/{id}", userHandler.GetUserById)
 		r.Get("/users/{id}/recipes", recipeHandler.ListRecipesByUserId)
+		r.Get("/users/{id}/likes", likeHandler.ListLikesByUserId)
 		r.Get("/users/recipes", recipeHandler.ListMyRecipes)
 		r.Patch("/users/profile", userHandler.UpdateUsername)
 		r.Patch("/users/password", userHandler.UpdatePassword)
@@ -63,7 +64,6 @@ func (cfg *ApiConfig) Router() http.Handler {
 		r.Delete("/recipes/{recipe_id}/ingredients/{ingredient_id}", recipeIngredientHandler.DeleteRecipeIngredient)
 
 		r.Post("/recipes/{recipe_id}/likes", likeHandler.CreateLike)
-		r.Get("/recipes/{recipe_id}/likes", likeHandler.ListLikesByUserId)
 		r.Delete("/recipes/{recipe_id}/likes", likeHandler.DeleteLike)
 	})
 

@@ -17,6 +17,7 @@ type SeedData struct {
 	Users       []database.User
 	Ingredients map[string]database.Ingredient
 	Recipes     []database.Recipe
+	Likes       []database.Like
 }
 
 func SeedBase(ctx context.Context, db *database.Queries, adminEmail, adminPassword string) (SeedData, error) {
@@ -114,6 +115,26 @@ func SeedTestData(ctx context.Context, db *database.Queries, adminEmail, adminPa
 				return SeedData{}, fmt.Errorf("seed recipe ingredient (%q, %q): %w", sr.name, sri.ingredientName, err)
 			}
 		}
+	}
+
+	data.Likes = make([]database.Like, 0, len(testLikes))
+	for _, sl := range testLikes {
+		user := data.Users[sl.userIndex]
+		recipe := data.Recipes[sl.recipeIndex]
+		like, err := db.GetLikeById(ctx, database.GetLikeByIdParams{
+			UserID:   user.ID,
+			RecipeID: recipe.ID,
+		})
+		if errors.Is(err, sql.ErrNoRows) {
+			like, err = db.CreateLike(ctx, database.CreateLikeParams{
+				UserID:   user.ID,
+				RecipeID: recipe.ID,
+			})
+		}
+		if err != nil {
+			return SeedData{}, fmt.Errorf("seed like (%q, %q): %w", user.Email, recipe.Name, err)
+		}
+		data.Likes = append(data.Likes, like)
 	}
 
 	return data, nil
