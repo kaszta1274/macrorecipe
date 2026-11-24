@@ -13,10 +13,12 @@ func TestLikes(t *testing.T) {
 	requireTestDB(t)
 
 	alice := testSeed.Users[0]
+	bob := testSeed.Users[1]
 	aliceRecipe := testSeed.Recipes[0] // not liked by alice
-	bobRecipe := testSeed.Recipes[2]   // already liked by alice in seeder
+	bobRecipe := testSeed.Recipes[2]   // already liked by alice in seeder (1 comment by alice)
 
 	aliceToken := mustToken(t, alice)
+	bobToken := mustToken(t, bob)
 
 	cases := []struct {
 		name       string
@@ -48,19 +50,37 @@ func TestLikes(t *testing.T) {
 			http.StatusUnauthorized, nil,
 		},
 		{
-			"list alice likes",
+			"list alice likes as alice",
 			http.MethodGet, "/api/users/" + alice.ID.String() + "/likes", aliceToken,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.LikeByUserId](t, rec)
+				got := decodeJSON[[]handler.LikedRecipe](t, rec)
 				if len(got) != 1 {
 					t.Fatalf("likes count = %d, want 1", len(got))
 				}
-				if got[0].UserID != alice.ID || got[0].RecipeID != bobRecipe.ID {
-					t.Fatalf("like ids = (%s, %s), want (%s, %s)", got[0].UserID, got[0].RecipeID, alice.ID, bobRecipe.ID)
+				r := got[0]
+				if r.ID != bobRecipe.ID || r.Name != bobRecipe.Name || r.Description != bobRecipe.Description {
+					t.Fatalf("unexpected liked recipe: %+v", r)
 				}
-				if got[0].RecipeName != bobRecipe.Name || got[0].RecipeDescription != bobRecipe.Description {
-					t.Fatalf("like recipe = (%q, %q), want (%q, %q)", got[0].RecipeName, got[0].RecipeDescription, bobRecipe.Name, bobRecipe.Description)
+				if r.Author.ID != bob.ID || r.Author.Username != bob.Username {
+					t.Fatalf("author = %+v, want (%s, %q)", r.Author, bob.ID, bob.Username)
+				}
+				if r.LikesCount != 1 || !r.LikedByMe || r.CommentsCount != 1 {
+					t.Fatalf("counts = (likes=%d liked=%v comments=%d), want (1, true, 1)", r.LikesCount, r.LikedByMe, r.CommentsCount)
+				}
+				if r.MacrosPerPortion.Calories <= 0 || r.LikedAt.IsZero() {
+					t.Fatalf("expected positive calories and liked_at, got %+v", r)
+				}
+			},
+		},
+		{
+			"list alice likes as bob sees liked_by_me false",
+			http.MethodGet, "/api/users/" + alice.ID.String() + "/likes", bobToken,
+			http.StatusOK,
+			func(t *testing.T, rec *httptest.ResponseRecorder) {
+				got := decodeJSON[[]handler.LikedRecipe](t, rec)
+				if len(got) != 1 || got[0].LikedByMe {
+					t.Fatalf("expected 1 liked recipe with liked_by_me=false for bob, got %+v", got)
 				}
 			},
 		},
@@ -69,7 +89,7 @@ func TestLikes(t *testing.T) {
 			http.MethodGet, "/api/users/" + testSeed.Admin.ID.String() + "/likes", aliceToken,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.LikeByUserId](t, rec)
+				got := decodeJSON[[]handler.LikedRecipe](t, rec)
 				if len(got) != 0 {
 					t.Fatalf("likes count = %d, want 0", len(got))
 				}

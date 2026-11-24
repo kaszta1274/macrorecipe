@@ -81,35 +81,85 @@ func (q *Queries) GetLikeById(ctx context.Context, arg GetLikeByIdParams) (Like,
 }
 
 const listLikesByUserId = `-- name: ListLikesByUserId :many
-SELECT 
-    likes.user_id,
-    likes.recipe_id,
-    recipes.name AS recipe_name,
-    recipes.description AS recipe_description,
-    likes.created_at
-FROM likes
-JOIN recipes ON likes.recipe_id = recipes.id
-WHERE likes.user_id = $1
-ORDER BY likes.created_at DESC, likes.recipe_id ASC
-LIMIT $2 OFFSET $3
+WITH page AS (
+    SELECT l.recipe_id, l.created_at AS liked_at
+    FROM likes l
+    WHERE l.user_id = $2::uuid
+    ORDER BY l.created_at DESC, l.recipe_id ASC
+    LIMIT $4 OFFSET $3
+)
+SELECT
+    r.id,
+    r.name,
+    r.description,
+    r.portions,
+    r.created_at,
+    r.updated_at,
+    p.liked_at,
+    u.id AS author_id,
+    u.username AS author_username,
+    COALESCE(m.protein, 0)::real AS total_protein,
+    COALESCE(m.fat, 0)::real AS total_fat,
+    COALESCE(m.carbs, 0)::real AS total_carbs,
+    COALESCE(lc.likes_count, 0)::bigint AS likes_count,
+    EXISTS (
+        SELECT 1 FROM likes ul
+        WHERE ul.recipe_id = r.id AND ul.user_id = $1::uuid
+    ) AS liked_by_me,
+    COALESCE(c.comments_count, 0)::bigint AS comments_count
+FROM page p
+JOIN recipes r ON r.id = p.recipe_id
+JOIN users u ON u.id = r.user_id
+LEFT JOIN LATERAL (
+    SELECT
+        SUM(i.protein * ri.amount / 100.0) AS protein,
+        SUM(i.fat * ri.amount / 100.0) AS fat,
+        SUM(i.carbohydrates * ri.amount / 100.0) AS carbs
+    FROM recipe_ingredients ri
+    JOIN ingredients i ON i.id = ri.ingredient_id
+    WHERE ri.recipe_id = r.id
+) m ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS likes_count FROM likes WHERE recipe_id = r.id
+) lc ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS comments_count FROM comments WHERE recipe_id = r.id
+) c ON true
+ORDER BY p.liked_at DESC, r.id ASC
 `
 
 type ListLikesByUserIdParams struct {
-	UserID uuid.UUID
-	Limit  int32
-	Offset int32
+	ViewerID uuid.UUID
+	UserID   uuid.UUID
+	Offset   int32
+	Limit    int32
 }
 
 type ListLikesByUserIdRow struct {
-	UserID            uuid.UUID
-	RecipeID          uuid.UUID
-	RecipeName        string
-	RecipeDescription string
-	CreatedAt         time.Time
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	Portions       int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LikedAt        time.Time
+	AuthorID       uuid.UUID
+	AuthorUsername string
+	TotalProtein   float32
+	TotalFat       float32
+	TotalCarbs     float32
+	LikesCount     int64
+	LikedByMe      bool
+	CommentsCount  int64
 }
 
 func (q *Queries) ListLikesByUserId(ctx context.Context, arg ListLikesByUserIdParams) ([]ListLikesByUserIdRow, error) {
-	rows, err := q.db.QueryContext(ctx, listLikesByUserId, arg.UserID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listLikesByUserId,
+		arg.ViewerID,
+		arg.UserID,
+		arg.Offset,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -118,11 +168,21 @@ func (q *Queries) ListLikesByUserId(ctx context.Context, arg ListLikesByUserIdPa
 	for rows.Next() {
 		var i ListLikesByUserIdRow
 		if err := rows.Scan(
-			&i.UserID,
-			&i.RecipeID,
-			&i.RecipeName,
-			&i.RecipeDescription,
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Portions,
 			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LikedAt,
+			&i.AuthorID,
+			&i.AuthorUsername,
+			&i.TotalProtein,
+			&i.TotalFat,
+			&i.TotalCarbs,
+			&i.LikesCount,
+			&i.LikedByMe,
+			&i.CommentsCount,
 		); err != nil {
 			return nil, err
 		}

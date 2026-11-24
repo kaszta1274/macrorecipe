@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -86,6 +87,190 @@ func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (Recipe, erro
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getRecipeDetailById = `-- name: GetRecipeDetailById :one
+SELECT
+    r.id,
+    r.name,
+    r.description,
+    r.instructions,
+    r.portions,
+    r.created_at,
+    r.updated_at,
+    u.id AS author_id,
+    u.username AS author_username,
+    COALESCE(l.likes_count, 0)::bigint AS likes_count,
+    EXISTS (
+        SELECT 1 FROM likes ul
+        WHERE ul.recipe_id = r.id AND ul.user_id = $1::uuid
+    ) AS liked_by_me,
+    COALESCE(c.comments_count, 0)::bigint AS comments_count
+FROM recipes r
+JOIN users u ON u.id = r.user_id
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS likes_count FROM likes WHERE recipe_id = r.id
+) l ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS comments_count FROM comments WHERE recipe_id = r.id
+) c ON true
+WHERE r.id = $2::uuid
+`
+
+type GetRecipeDetailByIdParams struct {
+	ViewerID uuid.UUID
+	ID       uuid.UUID
+}
+
+type GetRecipeDetailByIdRow struct {
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	Instructions   string
+	Portions       int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AuthorID       uuid.UUID
+	AuthorUsername string
+	LikesCount     int64
+	LikedByMe      bool
+	CommentsCount  int64
+}
+
+func (q *Queries) GetRecipeDetailById(ctx context.Context, arg GetRecipeDetailByIdParams) (GetRecipeDetailByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getRecipeDetailById, arg.ViewerID, arg.ID)
+	var i GetRecipeDetailByIdRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Instructions,
+		&i.Portions,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AuthorID,
+		&i.AuthorUsername,
+		&i.LikesCount,
+		&i.LikedByMe,
+		&i.CommentsCount,
+	)
+	return i, err
+}
+
+const listRecipeSummaries = `-- name: ListRecipeSummaries :many
+WITH page AS (
+    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.created_at, r.updated_at
+    FROM recipes r
+    WHERE ($2::uuid IS NULL OR r.user_id = $2::uuid)
+      AND r.name ILIKE '%' || $3::text || '%'
+    ORDER BY r.name ASC, r.id ASC
+    LIMIT $5 OFFSET $4
+)
+SELECT
+    p.id,
+    p.name,
+    p.description,
+    p.portions,
+    p.created_at,
+    p.updated_at,
+    u.id AS author_id,
+    u.username AS author_username,
+    COALESCE(m.protein, 0)::real AS total_protein,
+    COALESCE(m.fat, 0)::real AS total_fat,
+    COALESCE(m.carbs, 0)::real AS total_carbs,
+    COALESCE(l.likes_count, 0)::bigint AS likes_count,
+    EXISTS (
+        SELECT 1 FROM likes ul
+        WHERE ul.recipe_id = p.id AND ul.user_id = $1::uuid
+    ) AS liked_by_me,
+    COALESCE(c.comments_count, 0)::bigint AS comments_count
+FROM page p
+JOIN users u ON u.id = p.user_id
+LEFT JOIN LATERAL (
+    SELECT
+        SUM(i.protein * ri.amount / 100.0) AS protein,
+        SUM(i.fat * ri.amount / 100.0) AS fat,
+        SUM(i.carbohydrates * ri.amount / 100.0) AS carbs
+    FROM recipe_ingredients ri
+    JOIN ingredients i ON i.id = ri.ingredient_id
+    WHERE ri.recipe_id = p.id
+) m ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS likes_count FROM likes WHERE recipe_id = p.id
+) l ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS comments_count FROM comments WHERE recipe_id = p.id
+) c ON true
+ORDER BY p.name ASC, p.id ASC
+`
+
+type ListRecipeSummariesParams struct {
+	ViewerID    uuid.UUID
+	AuthorID    uuid.NullUUID
+	SearchQuery string
+	Offset      int32
+	Limit       int32
+}
+
+type ListRecipeSummariesRow struct {
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	Portions       int16
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AuthorID       uuid.UUID
+	AuthorUsername string
+	TotalProtein   float32
+	TotalFat       float32
+	TotalCarbs     float32
+	LikesCount     int64
+	LikedByMe      bool
+	CommentsCount  int64
+}
+
+func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummariesParams) ([]ListRecipeSummariesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecipeSummaries,
+		arg.ViewerID,
+		arg.AuthorID,
+		arg.SearchQuery,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecipeSummariesRow
+	for rows.Next() {
+		var i ListRecipeSummariesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Portions,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AuthorID,
+			&i.AuthorUsername,
+			&i.TotalProtein,
+			&i.TotalFat,
+			&i.TotalCarbs,
+			&i.LikesCount,
+			&i.LikedByMe,
+			&i.CommentsCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listRecipesByName = `-- name: ListRecipesByName :many

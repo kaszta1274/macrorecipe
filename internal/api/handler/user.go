@@ -26,6 +26,11 @@ type User struct {
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 
+type UserSummary struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+}
+
 type UserCreateRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`

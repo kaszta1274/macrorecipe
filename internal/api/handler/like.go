@@ -22,12 +22,9 @@ type Like struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-type LikeByUserId struct {
-	UserID            uuid.UUID `json:"user_id"`
-	RecipeID          uuid.UUID `json:"recipe_id"`
-	RecipeName        string    `json:"recipe_name"`
-	RecipeDescription string    `json:"recipe_description"`
-	CreatedAt         time.Time `json:"created_at"`
+type LikedRecipe struct {
+	RecipeSummary
+	LikedAt time.Time `json:"liked_at"`
 }
 
 type LikeHandler struct {
@@ -81,6 +78,12 @@ func (h *LikeHandler) CreateLike(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
 	userId, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, "invalid user id format", err)
@@ -90,16 +93,17 @@ func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) 
 	limit, offset, _ := request.ParsePagination(r)
 
 	likes, err := h.DB.ListLikesByUserId(r.Context(), database.ListLikesByUserIdParams{
-		UserID: userId,
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		UserID:   userId,
+		Limit:    int32(limit),
+		Offset:   int32(offset),
+		ViewerID: viewerID,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get likes", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(likes, toUserLike))
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(likes, toLikedRecipe))
 }
 
 func (h *LikeHandler) DeleteLike(w http.ResponseWriter, r *http.Request) {
@@ -135,12 +139,23 @@ func toLike(like database.Like) Like {
 	}
 }
 
-func toUserLike(like database.ListLikesByUserIdRow) LikeByUserId {
-	return LikeByUserId{
-		UserID:            like.UserID,
-		RecipeID:          like.RecipeID,
-		RecipeName:        like.RecipeName,
-		RecipeDescription: like.RecipeDescription,
-		CreatedAt:         like.CreatedAt,
+func toLikedRecipe(r database.ListLikesByUserIdRow) LikedRecipe {
+	portions := int(r.Portions)
+	summary := RecipeSummary{
+		ID:               r.ID,
+		Name:             r.Name,
+		Description:      r.Description,
+		Portions:         portions,
+		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername},
+		MacrosPerPortion: calculateMacrosPerPortion(float64(r.TotalProtein), float64(r.TotalFat), float64(r.TotalCarbs), portions),
+		LikesCount:       r.LikesCount,
+		LikedByMe:        r.LikedByMe,
+		CommentsCount:    r.CommentsCount,
+		CreatedAt:        r.CreatedAt,
+		UpdatedAt:        r.UpdatedAt,
+	}
+	return LikedRecipe{
+		RecipeSummary: summary,
+		LikedAt:       r.LikedAt,
 	}
 }

@@ -25,6 +25,27 @@ type Recipe struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type RecipeSummary struct {
+	ID               uuid.UUID   `json:"id"`
+	Name             string      `json:"name"`
+	Description      string      `json:"description"`
+	Portions         int         `json:"portions"`
+	Author           UserSummary `json:"author"`
+	MacrosPerPortion Macros      `json:"macros_per_portion"`
+	LikesCount       int64       `json:"likes_count"`
+	LikedByMe        bool        `json:"liked_by_me"`
+	CommentsCount    int64       `json:"comments_count"`
+	CreatedAt        time.Time   `json:"created_at"`
+	UpdatedAt        time.Time   `json:"updated_at"`
+}
+
+type RecipeDetail struct {
+	RecipeSummary
+	Instructions string                      `json:"instructions"`
+	Ingredients  []RecipeIngredientsByRecipe `json:"ingredients"`
+	MacrosTotal  Macros                      `json:"macros_total"`
+}
+
 type RecipeRequest struct {
 	Name         string `json:"name" validate:"required,min=2,max=100"`
 	Description  string `json:"description" validate:"required,min=2,max=1000"`
@@ -71,6 +92,12 @@ func (h *RecipeHandler) CreateRecipe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *RecipeHandler) GetRecipeById(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
@@ -83,7 +110,10 @@ func (h *RecipeHandler) GetRecipeById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recipe, err := h.DB.GetRecipeById(r.Context(), recipeId)
+	recipe, err := h.DB.GetRecipeDetailById(r.Context(), database.GetRecipeDetailByIdParams{
+		ViewerID: viewerID,
+		ID:       recipeId,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		response.RespondWithError(w, r, http.StatusNotFound, "recipe not found", nil)
 		return
@@ -93,23 +123,36 @@ func (h *RecipeHandler) GetRecipeById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, toRecipe(recipe))
+	ingredients, err := h.DB.ListRecipeIngredientsByRecipeId(r.Context(), recipe.ID)
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get recipe ingredients", err)
+		return
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, toRecipeDetail(recipe, ingredients))
 }
 
 func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
 	limit, offset, query := request.ParsePagination(r)
 
-	recipes, err := h.DB.ListRecipesByName(r.Context(), database.ListRecipesByNameParams{
+	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
+		SearchQuery: query,
 		Limit:       int32(limit),
 		Offset:      int32(offset),
-		SearchQuery: query,
+		ViewerID:    viewerID,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipe))
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipeSummary))
 }
 
 func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
@@ -121,21 +164,28 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 
 	limit, offset, query := request.ParsePagination(r)
 
-	recipes, err := h.DB.ListRecipesByUserId(r.Context(), database.ListRecipesByUserIdParams{
-		UserID:      userId,
+	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
+		AuthorID:    uuid.NullUUID{UUID: userId, Valid: true},
+		SearchQuery: query,
 		Limit:       int32(limit),
 		Offset:      int32(offset),
-		SearchQuery: query,
+		ViewerID:    userId,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipe))
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipeSummary))
 }
 
 func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
@@ -150,18 +200,19 @@ func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Reque
 
 	limit, offset, query := request.ParsePagination(r)
 
-	recipes, err := h.DB.ListRecipesByUserId(r.Context(), database.ListRecipesByUserIdParams{
-		UserID:      userId,
+	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
+		AuthorID:    uuid.NullUUID{UUID: userId, Valid: true},
+		SearchQuery: query,
 		Limit:       int32(limit),
 		Offset:      int32(offset),
-		SearchQuery: query,
+		ViewerID:    viewerID,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipe))
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipeSummary))
 }
 
 func (h *RecipeHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request) {
@@ -274,5 +325,53 @@ func toRecipe(recipe database.Recipe) Recipe {
 		Portions:     int(recipe.Portions),
 		CreatedAt:    recipe.CreatedAt,
 		UpdatedAt:    recipe.UpdatedAt,
+	}
+}
+
+func toRecipeDetail(recipe database.GetRecipeDetailByIdRow, ingredients []database.ListRecipeIngredientsByRecipeIdRow) RecipeDetail {
+	var totalProtein, totalFat, totalCarbs float64
+	for _, ing := range ingredients {
+		totalProtein += float64(ing.Protein) * float64(ing.Amount) / 100.0
+		totalFat += float64(ing.Fat) * float64(ing.Amount) / 100.0
+		totalCarbs += float64(ing.Carbohydrates) * float64(ing.Amount) / 100.0
+	}
+
+	portions := int(recipe.Portions)
+	summary := RecipeSummary{
+		ID:               recipe.ID,
+		Name:             recipe.Name,
+		Description:      recipe.Description,
+		Portions:         portions,
+		Author:           UserSummary{ID: recipe.AuthorID, Username: recipe.AuthorUsername},
+		MacrosPerPortion: calculateMacrosPerPortion(totalProtein, totalFat, totalCarbs, portions),
+		LikesCount:       recipe.LikesCount,
+		LikedByMe:        recipe.LikedByMe,
+		CommentsCount:    recipe.CommentsCount,
+		CreatedAt:        recipe.CreatedAt,
+		UpdatedAt:        recipe.UpdatedAt,
+	}
+
+	return RecipeDetail{
+		RecipeSummary: summary,
+		Instructions:  recipe.Instructions,
+		Ingredients:   mapSlice(ingredients, toRecipeIngredientDetail),
+		MacrosTotal:   calculateMacros(totalProtein, totalFat, totalCarbs),
+	}
+}
+
+func toRecipeSummary(r database.ListRecipeSummariesRow) RecipeSummary {
+	portions := int(r.Portions)
+	return RecipeSummary{
+		ID:               r.ID,
+		Name:             r.Name,
+		Description:      r.Description,
+		Portions:         portions,
+		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername},
+		MacrosPerPortion: calculateMacrosPerPortion(float64(r.TotalProtein), float64(r.TotalFat), float64(r.TotalCarbs), portions),
+		LikesCount:       r.LikesCount,
+		LikedByMe:        r.LikedByMe,
+		CommentsCount:    r.CommentsCount,
+		CreatedAt:        r.CreatedAt,
+		UpdatedAt:        r.UpdatedAt,
 	}
 }
