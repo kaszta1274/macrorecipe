@@ -70,7 +70,7 @@ func (h *IngredientHandler) CreateIngredient(w http.ResponseWriter, r *http.Requ
 	response.RespondWithJSON(
 		w,
 		http.StatusCreated,
-		databaseIngredientToResponseIngredient(ingredient),
+		toIngredient(ingredient),
 	)
 }
 
@@ -100,7 +100,7 @@ func (h *IngredientHandler) GetIngredientById(w http.ResponseWriter, r *http.Req
 	response.RespondWithJSON(
 		w,
 		http.StatusOK,
-		databaseIngredientToResponseIngredient(ingredient),
+		toIngredient(ingredient),
 	)
 }
 
@@ -121,7 +121,7 @@ func (h *IngredientHandler) ListIngredients(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	respondWithIngredientsJSON(w, ingredients)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(ingredients, toIngredient))
 }
 
 func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Request) {
@@ -164,7 +164,7 @@ func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, databaseIngredientToResponseIngredient(updatedIngredient))
+	response.RespondWithJSON(w, http.StatusOK, toIngredient(updatedIngredient))
 }
 
 func (h *IngredientHandler) DeleteIngredient(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +189,7 @@ func (h *IngredientHandler) DeleteIngredient(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func databaseIngredientToResponseIngredient(ingredient database.Ingredient) Ingredient {
+func toIngredient(ingredient database.Ingredient) Ingredient {
 	return Ingredient{
 		ID:            ingredient.ID,
 		Name:          ingredient.Name,
@@ -199,13 +199,4 @@ func databaseIngredientToResponseIngredient(ingredient database.Ingredient) Ingr
 		CreatedAt:     ingredient.CreatedAt,
 		UpdatedAt:     ingredient.UpdatedAt,
 	}
-}
-
-func respondWithIngredientsJSON(w http.ResponseWriter, ingredients []database.Ingredient) {
-	resp := []Ingredient{}
-
-	for _, ingredient := range ingredients {
-		resp = append(resp, databaseIngredientToResponseIngredient(ingredient))
-	}
-	response.RespondWithJSON(w, http.StatusOK, resp)
 }

@@ -67,7 +67,7 @@ func (h *RecipeHandler) CreateRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusCreated, databaseRecipeToResponseRecipe(recipe))
+	response.RespondWithJSON(w, http.StatusCreated, toRecipe(recipe))
 }
 
 func (h *RecipeHandler) GetRecipeById(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +93,7 @@ func (h *RecipeHandler) GetRecipeById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, databaseRecipeToResponseRecipe(recipe))
+	response.RespondWithJSON(w, http.StatusOK, toRecipe(recipe))
 }
 
 func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,7 @@ func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	respondWithRecipesJSON(w, recipes)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipe))
 }
 
 func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +132,7 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithRecipesJSON(w, recipes)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipe))
 }
 
 func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Request) {
@@ -161,7 +161,7 @@ func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	respondWithRecipesJSON(w, recipes)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipe))
 }
 
 func (h *RecipeHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request) {
@@ -219,7 +219,7 @@ func (h *RecipeHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, databaseRecipeToResponseRecipe(updatedRecipe))
+	response.RespondWithJSON(w, http.StatusOK, toRecipe(updatedRecipe))
 }
 
 func (h *RecipeHandler) DeleteRecipe(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +264,7 @@ func (h *RecipeHandler) DeleteRecipe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func databaseRecipeToResponseRecipe(recipe database.Recipe) Recipe {
+func toRecipe(recipe database.Recipe) Recipe {
 	return Recipe{
 		ID:           recipe.ID,
 		UserID:       recipe.UserID,
@@ -275,13 +275,4 @@ func databaseRecipeToResponseRecipe(recipe database.Recipe) Recipe {
 		CreatedAt:    recipe.CreatedAt,
 		UpdatedAt:    recipe.UpdatedAt,
 	}
-}
-
-func respondWithRecipesJSON(w http.ResponseWriter, recipes []database.Recipe) {
-	resp := []Recipe{}
-
-	for _, recipe := range recipes {
-		resp = append(resp, databaseRecipeToResponseRecipe(recipe))
-	}
-	response.RespondWithJSON(w, http.StatusOK, resp)
 }

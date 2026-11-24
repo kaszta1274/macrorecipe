@@ -116,7 +116,7 @@ func (h *RecipeIngredientHandler) CreateRecipeIngredient(w http.ResponseWriter, 
 	response.RespondWithJSON(
 		w,
 		http.StatusCreated,
-		databaseRecipeIngredientToResponseRecipeIngredient(recipeIngredient),
+		toRecipeIngredient(recipeIngredient),
 	)
 }
 
@@ -133,7 +133,7 @@ func (h *RecipeIngredientHandler) ListRecipeIngredientsByRecipeId(w http.Respons
 		return
 	}
 
-	respondWithRecipeIngredientsJSON(w, recipeIngredients)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipeIngredients, toRecipeIngredientDetail))
 }
 
 func (h *RecipeIngredientHandler) UpdateRecipeIngredient(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +192,7 @@ func (h *RecipeIngredientHandler) UpdateRecipeIngredient(w http.ResponseWriter, 
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, databaseRecipeIngredientToResponseRecipeIngredient(updatedRecipeIngredient))
+	response.RespondWithJSON(w, http.StatusOK, toRecipeIngredient(updatedRecipeIngredient))
 }
 
 func (h *RecipeIngredientHandler) DeleteRecipeIngredient(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +240,7 @@ func (h *RecipeIngredientHandler) DeleteRecipeIngredient(w http.ResponseWriter, 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func databaseRecipeIngredientToResponseRecipeIngredient(recipeIngredient database.RecipeIngredient) RecipeIngredient {
+func toRecipeIngredient(recipeIngredient database.RecipeIngredient) RecipeIngredient {
 	return RecipeIngredient{
 		RecipeID:     recipeIngredient.RecipeID,
 		IngredientID: recipeIngredient.IngredientID,
@@ -250,21 +250,16 @@ func databaseRecipeIngredientToResponseRecipeIngredient(recipeIngredient databas
 	}
 }
 
-func respondWithRecipeIngredientsJSON(w http.ResponseWriter, recipeIngredients []database.ListRecipeIngredientsByRecipeIdRow) {
-	resp := []RecipeIngredientsByRecipe{}
-
-	for _, ri := range recipeIngredients {
-		resp = append(resp, RecipeIngredientsByRecipe{
-			RecipeID:       ri.RecipeID,
-			IngredientID:   ri.IngredientID,
-			IngredientName: ri.IngredientName,
-			Amount:         ri.Amount,
-			Protein:        ri.Protein,
-			Fat:            ri.Fat,
-			Carbohydrates:  ri.Carbohydrates,
-			CreatedAt:      ri.CreatedAt,
-			UpdatedAt:      ri.UpdatedAt,
-		})
+func toRecipeIngredientDetail(ri database.ListRecipeIngredientsByRecipeIdRow) RecipeIngredientsByRecipe {
+	return RecipeIngredientsByRecipe{
+		RecipeID:       ri.RecipeID,
+		IngredientID:   ri.IngredientID,
+		IngredientName: ri.IngredientName,
+		Amount:         ri.Amount,
+		Protein:        ri.Protein,
+		Fat:            ri.Fat,
+		Carbohydrates:  ri.Carbohydrates,
+		CreatedAt:      ri.CreatedAt,
+		UpdatedAt:      ri.UpdatedAt,
 	}
-	response.RespondWithJSON(w, http.StatusOK, resp)
 }

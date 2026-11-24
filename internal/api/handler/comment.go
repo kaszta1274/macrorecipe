@@ -92,7 +92,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusCreated, databaseCommentToResponseComment(comment))
+	response.RespondWithJSON(w, http.StatusCreated, toComment(comment))
 }
 
 func (h *CommentHandler) ListCommentsByRecipeId(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +124,7 @@ func (h *CommentHandler) ListCommentsByRecipeId(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	respondWithCommentsJSON(w, comments)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(comments, toRecipeComment))
 }
 
 func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +178,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, databaseCommentToResponseComment(updatedComment))
+	response.RespondWithJSON(w, http.StatusOK, toComment(updatedComment))
 }
 
 func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +217,7 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func databaseCommentToResponseComment(comment database.Comment) Comment {
+func toComment(comment database.Comment) Comment {
 	return Comment{
 		ID:        comment.ID,
 		UserID:    comment.UserID,
@@ -228,19 +228,14 @@ func databaseCommentToResponseComment(comment database.Comment) Comment {
 	}
 }
 
-func respondWithCommentsJSON(w http.ResponseWriter, comments []database.ListCommentsByRecipeIdRow) {
-	resp := []CommentsByRecipeId{}
-
-	for _, comment := range comments {
-		resp = append(resp, CommentsByRecipeId{
-			ID:        comment.ID,
-			UserID:    comment.UserID,
-			Username:  comment.Username,
-			RecipeID:  comment.RecipeID,
-			Body:      comment.Body,
-			CreatedAt: comment.CreatedAt,
-			UpdatedAt: comment.UpdatedAt,
-		})
+func toRecipeComment(comment database.ListCommentsByRecipeIdRow) CommentsByRecipeId {
+	return CommentsByRecipeId{
+		ID:        comment.ID,
+		UserID:    comment.UserID,
+		Username:  comment.Username,
+		RecipeID:  comment.RecipeID,
+		Body:      comment.Body,
+		CreatedAt: comment.CreatedAt,
+		UpdatedAt: comment.UpdatedAt,
 	}
-	response.RespondWithJSON(w, http.StatusOK, resp)
 }

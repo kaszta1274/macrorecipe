@@ -77,7 +77,7 @@ func (h *LikeHandler) CreateLike(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusCreated, databaseLikeToResponseLike(like))
+	response.RespondWithJSON(w, http.StatusCreated, toLike(like))
 }
 
 func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,7 @@ func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	respondWithLikesJSON(w, likes)
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(likes, toUserLike))
 }
 
 func (h *LikeHandler) DeleteLike(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +127,7 @@ func (h *LikeHandler) DeleteLike(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func databaseLikeToResponseLike(like database.Like) Like {
+func toLike(like database.Like) Like {
 	return Like{
 		UserID:    like.UserID,
 		RecipeID:  like.RecipeID,
@@ -135,17 +135,12 @@ func databaseLikeToResponseLike(like database.Like) Like {
 	}
 }
 
-func respondWithLikesJSON(w http.ResponseWriter, likes []database.ListLikesByUserIdRow) {
-	resp := []LikeByUserId{}
-
-	for _, like := range likes {
-		resp = append(resp, LikeByUserId{
-			UserID:            like.UserID,
-			RecipeID:          like.RecipeID,
-			RecipeName:        like.RecipeName,
-			RecipeDescription: like.RecipeDescription,
-			CreatedAt:         like.CreatedAt,
-		})
+func toUserLike(like database.ListLikesByUserIdRow) LikeByUserId {
+	return LikeByUserId{
+		UserID:            like.UserID,
+		RecipeID:          like.RecipeID,
+		RecipeName:        like.RecipeName,
+		RecipeDescription: like.RecipeDescription,
+		CreatedAt:         like.CreatedAt,
 	}
-	response.RespondWithJSON(w, http.StatusOK, resp)
 }

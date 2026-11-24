@@ -147,7 +147,7 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.RespondWithJSON(w, http.StatusOK, UserLoginResponse{
-		User:  databaseUserToResponseUser(user),
+		User:  toUser(user),
 		Token: accessToken,
 	})
 }
@@ -175,7 +175,7 @@ func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, databaseUserToResponseUser(user))
+	response.RespondWithJSON(w, http.StatusOK, toUser(user))
 }
 
 func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
@@ -314,7 +314,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func databaseUserToResponseUser(user database.User) User {
+func toUser(user database.User) User {
 	return User{
 		ID:        user.ID,
 		Email:     user.Email,
