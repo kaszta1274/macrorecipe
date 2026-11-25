@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -139,13 +140,20 @@ func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	ingredientIDs, err := parseIngredientIDs(r)
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid ingredient_ids format", err)
+		return
+	}
+
 	limit, offset, query := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
-		SearchQuery: query,
-		Limit:       int32(limit),
-		Offset:      int32(offset),
-		ViewerID:    viewerID,
+		SearchQuery:   query,
+		IngredientIds: ingredientIDs,
+		Limit:         int32(limit),
+		Offset:        int32(offset),
+		ViewerID:      viewerID,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
@@ -165,11 +173,12 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 	limit, offset, query := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
-		AuthorID:    uuid.NullUUID{UUID: userId, Valid: true},
-		SearchQuery: query,
-		Limit:       int32(limit),
-		Offset:      int32(offset),
-		ViewerID:    userId,
+		AuthorID:      uuid.NullUUID{UUID: userId, Valid: true},
+		SearchQuery:   query,
+		IngredientIds: []uuid.UUID{},
+		Limit:         int32(limit),
+		Offset:        int32(offset),
+		ViewerID:      userId,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
@@ -201,11 +210,12 @@ func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Reque
 	limit, offset, query := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
-		AuthorID:    uuid.NullUUID{UUID: userId, Valid: true},
-		SearchQuery: query,
-		Limit:       int32(limit),
-		Offset:      int32(offset),
-		ViewerID:    viewerID,
+		AuthorID:      uuid.NullUUID{UUID: userId, Valid: true},
+		SearchQuery:   query,
+		IngredientIds: []uuid.UUID{},
+		Limit:         int32(limit),
+		Offset:        int32(offset),
+		ViewerID:      viewerID,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list recipes", err)
@@ -313,6 +323,29 @@ func (h *RecipeHandler) DeleteRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseIngredientIDs(r *http.Request) ([]uuid.UUID, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("ingredient_ids"))
+	if raw == "" {
+		return []uuid.UUID{}, nil // non-nil so pq.Array sends '{}' (cardinality 0) instead of NULL
+	}
+
+	parts := strings.Split(raw, ",")
+	ids := make([]uuid.UUID, 0, len(parts))
+	seen := make(map[uuid.UUID]struct{}, len(parts))
+	for _, part := range parts {
+		id, err := uuid.Parse(strings.TrimSpace(part))
+		if err != nil {
+			return nil, err
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func toRecipe(recipe database.Recipe) Recipe {

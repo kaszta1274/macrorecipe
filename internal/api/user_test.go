@@ -3,6 +3,7 @@ package api_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -47,10 +48,33 @@ func TestUsers(t *testing.T) {
 			http.StatusConflict, nil,
 		},
 		{
-			"get user",
-			http.MethodGet, "/api/users/" + alice.ID.String(), aliceToken, nil,
+			"get me",
+			http.MethodGet, "/api/users/me", aliceToken, nil,
 			http.StatusOK,
 			assertUser(alice.ID, alice.Email, alice.Username, database.UserRoleUser),
+		},
+		{
+			"get me unauthenticated",
+			http.MethodGet, "/api/users/me", "", nil,
+			http.StatusUnauthorized, nil,
+		},
+		{
+			"get public user profile omits email",
+			http.MethodGet, "/api/users/" + alice.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			func(t *testing.T, rec *httptest.ResponseRecorder) {
+				raw := rec.Body.String()
+				if strings.Contains(raw, "email") || strings.Contains(raw, "role") {
+					t.Fatalf("public profile must not expose email or role: %s", raw)
+				}
+				got := decodeJSON[handler.UserPublicProfile](t, rec)
+				if got.ID != alice.ID || got.Username != alice.Username {
+					t.Fatalf("profile = %+v, want (%s, %q)", got, alice.ID, alice.Username)
+				}
+				if got.RecipesCount != 2 {
+					t.Fatalf("recipes_count = %d, want 2", got.RecipesCount)
+				}
+			},
 		},
 		{
 			"get missing user",

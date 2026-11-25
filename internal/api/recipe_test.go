@@ -16,6 +16,10 @@ func TestRecipes(t *testing.T) {
 	bob := testSeed.Users[1]
 	aliceRecipe := testSeed.Recipes[0] // Chicken and Rice Bowl: 2 portions, 4 ingredients, 1 like (bob), 2 comments
 
+	chicken := testSeed.Ingredients["Chicken Breast"]
+	oliveOil := testSeed.Ingredients["Olive Oil"]
+	salmon := testSeed.Ingredients["Salmon Fillet"]
+
 	aliceToken := mustToken(t, alice)
 	bobToken := mustToken(t, bob)
 	adminToken := mustToken(t, testSeed.Admin)
@@ -112,31 +116,45 @@ func TestRecipes(t *testing.T) {
 			},
 		},
 		{
+			"list recipes by single ingredient",
+			http.MethodGet, "/api/recipes?ingredient_ids=" + oliveOil.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			assertRecipeSummaryCount(2),
+		},
+		{
+			"list recipes by multiple ingredients AND match",
+			http.MethodGet, "/api/recipes?ingredient_ids=" + chicken.ID.String() + "," + oliveOil.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			assertRecipeSummaryIDs(aliceRecipe.ID),
+		},
+		{
+			"list recipes deduplicates repeated ingredient_ids",
+			http.MethodGet, "/api/recipes?ingredient_ids=" + chicken.ID.String() + "," + chicken.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			assertRecipeSummaryIDs(aliceRecipe.ID),
+		},
+		{
+			"list recipes no match for incompatible ingredients",
+			http.MethodGet, "/api/recipes?ingredient_ids=" + chicken.ID.String() + "," + salmon.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			assertRecipeSummaryCount(0),
+		},
+		{
+			"list recipes invalid ingredient_ids",
+			http.MethodGet, "/api/recipes?ingredient_ids=not-a-uuid", aliceToken, nil,
+			http.StatusBadRequest, nil,
+		},
+		{
 			"list by user id",
 			http.MethodGet, "/api/users/" + alice.ID.String() + "/recipes", aliceToken, nil,
 			http.StatusOK,
-			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.RecipeSummary](t, rec)
-				if len(got) != 2 {
-					t.Fatalf("recipe count = %d, want 2", len(got))
-				}
-				for _, r := range got {
-					if r.Author.ID != alice.ID || r.Author.Username != alice.Username {
-						t.Fatalf("unexpected author = %+v, want %s", r.Author, alice.ID)
-					}
-				}
-			},
+			assertRecipeSummaryAuthor(alice.ID, alice.Username, 2),
 		},
 		{
 			"list my recipes",
 			http.MethodGet, "/api/users/recipes", aliceToken, nil,
 			http.StatusOK,
-			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.RecipeSummary](t, rec)
-				if len(got) != 2 {
-					t.Fatalf("my recipes count = %d, want 2", len(got))
-				}
-			},
+			assertRecipeSummaryAuthor(alice.ID, alice.Username, 2),
 		},
 		{
 			"alice update own",
@@ -205,6 +223,46 @@ func assertRecipe(wantID, wantUserID uuid.UUID, wantName string, wantPortions in
 		}
 		if got.Portions != wantPortions {
 			t.Fatalf("portions = %d, want %d", got.Portions, wantPortions)
+		}
+	}
+}
+
+func assertRecipeSummaryCount(want int) func(*testing.T, *httptest.ResponseRecorder) {
+	return func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		got := decodeJSON[[]handler.RecipeSummary](t, rec)
+		if len(got) != want {
+			t.Fatalf("recipe count = %d, want %d", len(got), want)
+		}
+	}
+}
+
+func assertRecipeSummaryIDs(wantIDs ...uuid.UUID) func(*testing.T, *httptest.ResponseRecorder) {
+	return func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		got := decodeJSON[[]handler.RecipeSummary](t, rec)
+		if len(got) != len(wantIDs) {
+			t.Fatalf("recipe count = %d, want %d", len(got), len(wantIDs))
+		}
+		for i, wantID := range wantIDs {
+			if got[i].ID != wantID {
+				t.Fatalf("recipe[%d].id = %s, want %s", i, got[i].ID, wantID)
+			}
+		}
+	}
+}
+
+func assertRecipeSummaryAuthor(wantID uuid.UUID, wantUsername string, wantCount int) func(*testing.T, *httptest.ResponseRecorder) {
+	return func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		got := decodeJSON[[]handler.RecipeSummary](t, rec)
+		if len(got) != wantCount {
+			t.Fatalf("recipe count = %d, want %d", len(got), wantCount)
+		}
+		for _, r := range got {
+			if r.Author.ID != wantID || r.Author.Username != wantUsername {
+				t.Fatalf("author = %+v, want (%s, %q)", r.Author, wantID, wantUsername)
+			}
 		}
 	}
 }

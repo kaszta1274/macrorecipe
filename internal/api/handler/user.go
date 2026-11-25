@@ -31,6 +31,13 @@ type UserSummary struct {
 	Username string    `json:"username"`
 }
 
+type UserPublicProfile struct {
+	ID           uuid.UUID `json:"id"`
+	Username     string    `json:"username"`
+	RecipesCount int64     `json:"recipes_count"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 type UserCreateRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`
@@ -157,16 +164,10 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if id == "" {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
-		return
-	}
-
-	userId, err := uuid.Parse(id)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, "invalid user id format", err)
+func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	userId, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
 		return
 	}
 
@@ -181,6 +182,32 @@ func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.RespondWithJSON(w, http.StatusOK, toUser(user))
+}
+
+func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
+		return
+	}
+
+	userId, err := uuid.Parse(id)
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid user id format", err)
+		return
+	}
+
+	profile, err := h.DB.GetUserPublicProfileById(r.Context(), userId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
+		return
+	}
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get user", err)
+		return
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, toUserPublicProfile(profile))
 }
 
 func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
@@ -327,5 +354,14 @@ func toUser(user database.User) User {
 		Role:      user.Role,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
+	}
+}
+
+func toUserPublicProfile(p database.GetUserPublicProfileByIdRow) UserPublicProfile {
+	return UserPublicProfile{
+		ID:           p.ID,
+		Username:     p.Username,
+		RecipesCount: p.RecipesCount,
+		CreatedAt:    p.CreatedAt,
 	}
 }

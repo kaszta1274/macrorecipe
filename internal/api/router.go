@@ -57,6 +57,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(apiLimiter)
 
+			r.Get("/users/me", userHandler.GetMe)
 			r.Get("/users/{id}", userHandler.GetUserById)
 			r.Get("/users/{id}/recipes", recipeHandler.ListRecipesByUserId)
 			r.Get("/users/{id}/likes", likeHandler.ListLikesByUserId)
