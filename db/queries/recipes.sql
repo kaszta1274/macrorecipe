@@ -50,6 +50,16 @@ WITH page AS (
     FROM recipes r
     WHERE (sqlc.narg('author_id')::uuid IS NULL OR r.user_id = sqlc.narg('author_id')::uuid)
       AND r.name ILIKE '%' || sqlc.arg('search_query')::text || '%'
+      AND (
+          cardinality(sqlc.arg('ingredient_ids')::uuid[]) = 0
+          OR r.id IN (
+              SELECT ri.recipe_id
+              FROM recipe_ingredients ri
+              WHERE ri.ingredient_id = ANY(sqlc.arg('ingredient_ids')::uuid[])
+              GROUP BY ri.recipe_id
+              HAVING COUNT(DISTINCT ri.ingredient_id) = cardinality(sqlc.arg('ingredient_ids')::uuid[])
+          )
+      )
     ORDER BY r.name ASC, r.id ASC
     LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
 )
@@ -89,13 +99,6 @@ LEFT JOIN LATERAL (
     SELECT COUNT(*) AS comments_count FROM comments WHERE recipe_id = p.id
 ) c ON true
 ORDER BY p.name ASC, p.id ASC;
-
--- name: ListRecipesByName :many
-SELECT id, user_id, name, description, instructions, portions, created_at, updated_at
-FROM recipes
-WHERE name ILIKE '%' || sqlc.arg('search_query')::text || '%'
-ORDER BY name ASC
-LIMIT $1 OFFSET $2;
 
 -- name: ListRecipesByUserId :many
 SELECT id, user_id, name, description, instructions, portions, created_at, updated_at

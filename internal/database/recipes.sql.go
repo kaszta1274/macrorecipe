@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const createRecipe = `-- name: CreateRecipe :one
@@ -163,8 +164,18 @@ WITH page AS (
     FROM recipes r
     WHERE ($2::uuid IS NULL OR r.user_id = $2::uuid)
       AND r.name ILIKE '%' || $3::text || '%'
+      AND (
+          cardinality($4::uuid[]) = 0
+          OR r.id IN (
+              SELECT ri.recipe_id
+              FROM recipe_ingredients ri
+              WHERE ri.ingredient_id = ANY($4::uuid[])
+              GROUP BY ri.recipe_id
+              HAVING COUNT(DISTINCT ri.ingredient_id) = cardinality($4::uuid[])
+          )
+      )
     ORDER BY r.name ASC, r.id ASC
-    LIMIT $5 OFFSET $4
+    LIMIT $6 OFFSET $5
 )
 SELECT
     p.id,
@@ -205,11 +216,12 @@ ORDER BY p.name ASC, p.id ASC
 `
 
 type ListRecipeSummariesParams struct {
-	ViewerID    uuid.UUID
-	AuthorID    uuid.NullUUID
-	SearchQuery string
-	Offset      int32
-	Limit       int32
+	ViewerID      uuid.UUID
+	AuthorID      uuid.NullUUID
+	SearchQuery   string
+	IngredientIds []uuid.UUID
+	Offset        int32
+	Limit         int32
 }
 
 type ListRecipeSummariesRow struct {
@@ -234,6 +246,7 @@ func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummari
 		arg.ViewerID,
 		arg.AuthorID,
 		arg.SearchQuery,
+		pq.Array(arg.IngredientIds),
 		arg.Offset,
 		arg.Limit,
 	)
@@ -259,52 +272,6 @@ func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummari
 			&i.LikesCount,
 			&i.LikedByMe,
 			&i.CommentsCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRecipesByName = `-- name: ListRecipesByName :many
-SELECT id, user_id, name, description, instructions, portions, created_at, updated_at
-FROM recipes
-WHERE name ILIKE '%' || $3::text || '%'
-ORDER BY name ASC
-LIMIT $1 OFFSET $2
-`
-
-type ListRecipesByNameParams struct {
-	Limit       int32
-	Offset      int32
-	SearchQuery string
-}
-
-func (q *Queries) ListRecipesByName(ctx context.Context, arg ListRecipesByNameParams) ([]Recipe, error) {
-	rows, err := q.db.QueryContext(ctx, listRecipesByName, arg.Limit, arg.Offset, arg.SearchQuery)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Recipe
-	for rows.Next() {
-		var i Recipe
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.Description,
-			&i.Instructions,
-			&i.Portions,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

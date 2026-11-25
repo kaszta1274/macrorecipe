@@ -21,6 +21,15 @@ SELECT id, email, username, password_hash, role, created_at, updated_at
 FROM users
 WHERE id = $1;
 
+-- name: GetUserPublicProfileById :one
+SELECT
+    u.id,
+    u.username,
+    u.created_at,
+    (SELECT COUNT(*) FROM recipes r WHERE r.user_id = u.id)::bigint AS recipes_count
+FROM users u
+WHERE u.id = $1;
+
 -- name: UpdateUser :one
 UPDATE users
 SET username = $2, updated_at = NOW()

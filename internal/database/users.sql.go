@@ -113,6 +113,35 @@ func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const getUserPublicProfileById = `-- name: GetUserPublicProfileById :one
+SELECT
+    u.id,
+    u.username,
+    u.created_at,
+    (SELECT COUNT(*) FROM recipes r WHERE r.user_id = u.id)::bigint AS recipes_count
+FROM users u
+WHERE u.id = $1
+`
+
+type GetUserPublicProfileByIdRow struct {
+	ID           uuid.UUID
+	Username     string
+	CreatedAt    time.Time
+	RecipesCount int64
+}
+
+func (q *Queries) GetUserPublicProfileById(ctx context.Context, id uuid.UUID) (GetUserPublicProfileByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserPublicProfileById, id)
+	var i GetUserPublicProfileByIdRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.CreatedAt,
+		&i.RecipesCount,
+	)
+	return i, err
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET username = $2, updated_at = NOW()
