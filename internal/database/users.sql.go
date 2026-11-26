@@ -118,26 +118,43 @@ SELECT
     u.id,
     u.username,
     u.created_at,
-    (SELECT COUNT(*) FROM recipes r WHERE r.user_id = u.id)::bigint AS recipes_count
+    (SELECT COUNT(*) FROM recipes r WHERE r.user_id = u.id)::bigint AS recipes_count,
+    (SELECT COUNT(*) FROM follows f WHERE f.following_id = u.id)::bigint AS followers_count,
+    (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id)::bigint AS following_count,
+    EXISTS (
+        SELECT 1 FROM follows vf
+        WHERE vf.follower_id = $1::uuid AND vf.following_id = u.id 
+    ) AS followed_by_me
 FROM users u
-WHERE u.id = $1
+WHERE u.id = $2::uuid
 `
 
-type GetUserPublicProfileByIdRow struct {
-	ID           uuid.UUID
-	Username     string
-	CreatedAt    time.Time
-	RecipesCount int64
+type GetUserPublicProfileByIdParams struct {
+	ViewerID uuid.UUID
+	ID       uuid.UUID
 }
 
-func (q *Queries) GetUserPublicProfileById(ctx context.Context, id uuid.UUID) (GetUserPublicProfileByIdRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserPublicProfileById, id)
+type GetUserPublicProfileByIdRow struct {
+	ID             uuid.UUID
+	Username       string
+	CreatedAt      time.Time
+	RecipesCount   int64
+	FollowersCount int64
+	FollowingCount int64
+	FollowedByMe   bool
+}
+
+func (q *Queries) GetUserPublicProfileById(ctx context.Context, arg GetUserPublicProfileByIdParams) (GetUserPublicProfileByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserPublicProfileById, arg.ViewerID, arg.ID)
 	var i GetUserPublicProfileByIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.CreatedAt,
 		&i.RecipesCount,
+		&i.FollowersCount,
+		&i.FollowingCount,
+		&i.FollowedByMe,
 	)
 	return i, err
 }

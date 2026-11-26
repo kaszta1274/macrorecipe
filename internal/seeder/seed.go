@@ -19,6 +19,7 @@ type SeedData struct {
 	Recipes     []database.Recipe
 	Likes       []database.Like
 	Comments    []database.Comment
+	Follows     []database.Follow
 }
 
 func SeedBase(ctx context.Context, db *database.Queries, adminEmail, adminPassword string) (SeedData, error) {
@@ -185,6 +186,26 @@ func SeedTestData(ctx context.Context, db *database.Queries, adminEmail, adminPa
 			existingCommentsByRecipe[recipe.ID][key] = comment
 		}
 		data.Comments = append(data.Comments, comment)
+	}
+
+	data.Follows = make([]database.Follow, 0, len(testFollows))
+	for _, sf := range testFollows {
+		follower := data.Users[sf.followerIndex]
+		following := data.Users[sf.followingIndex]
+		follow, err := db.GetFollowById(ctx, database.GetFollowByIdParams{
+			FollowerID:  follower.ID,
+			FollowingID: following.ID,
+		})
+		if errors.Is(err, sql.ErrNoRows) {
+			follow, err = db.CreateFollow(ctx, database.CreateFollowParams{
+				FollowerID:  follower.ID,
+				FollowingID: following.ID,
+			})
+		}
+		if err != nil {
+			return SeedData{}, fmt.Errorf("seed follow (%q -> %q): %w", follower.Email, following.Email, err)
+		}
+		data.Follows = append(data.Follows, follow)
 	}
 
 	return data, nil

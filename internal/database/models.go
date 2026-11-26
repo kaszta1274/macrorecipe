@@ -63,6 +63,12 @@ type Comment struct {
 	UpdatedAt time.Time
 }
 
+type Follow struct {
+	FollowerID  uuid.UUID
+	FollowingID uuid.UUID
+	CreatedAt   time.Time
+}
+
 type Ingredient struct {
 	ID            uuid.UUID
 	Name          string

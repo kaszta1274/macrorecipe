@@ -133,6 +133,28 @@ func (h *RecipeHandler) GetRecipeById(w http.ResponseWriter, r *http.Request) {
 	response.RespondWithJSON(w, http.StatusOK, toRecipeDetail(recipe, ingredients))
 }
 
+func (h *RecipeHandler) ListFeedRecipes(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
+	limit, offset, _ := request.ParsePagination(r)
+
+	recipes, err := h.DB.ListFeedRecipes(r.Context(), database.ListFeedRecipesParams{
+		ViewerID: viewerID,
+		Offset:   int32(offset),
+		Limit:    int32(limit),
+	})
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list feed recipes", err)
+		return
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toFeedRecipeSummary))
+}
+
 func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request) {
 	viewerID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -393,6 +415,23 @@ func toRecipeDetail(recipe database.GetRecipeDetailByIdRow, ingredients []databa
 }
 
 func toRecipeSummary(r database.ListRecipeSummariesRow) RecipeSummary {
+	portions := int(r.Portions)
+	return RecipeSummary{
+		ID:               r.ID,
+		Name:             r.Name,
+		Description:      r.Description,
+		Portions:         portions,
+		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername},
+		MacrosPerPortion: calculateMacrosPerPortion(float64(r.TotalProtein), float64(r.TotalFat), float64(r.TotalCarbs), portions),
+		LikesCount:       r.LikesCount,
+		LikedByMe:        r.LikedByMe,
+		CommentsCount:    r.CommentsCount,
+		CreatedAt:        r.CreatedAt,
+		UpdatedAt:        r.UpdatedAt,
+	}
+}
+
+func toFeedRecipeSummary(r database.ListFeedRecipesRow) RecipeSummary {
 	portions := int(r.Portions)
 	return RecipeSummary{
 		ID:               r.ID,

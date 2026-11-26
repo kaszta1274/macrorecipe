@@ -32,10 +32,13 @@ type UserSummary struct {
 }
 
 type UserPublicProfile struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	RecipesCount int64     `json:"recipes_count"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             uuid.UUID `json:"id"`
+	Username       string    `json:"username"`
+	RecipesCount   int64     `json:"recipes_count"`
+	FollowersCount int64     `json:"followers_count"`
+	FollowingCount int64     `json:"following_count"`
+	FollowedByMe   bool      `json:"followed_by_me"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type UserCreateRequest struct {
@@ -185,6 +188,12 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		response.RespondWithError(w, r, http.StatusBadRequest, "invalid request", nil)
@@ -197,7 +206,10 @@ func (h *UserHandler) GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := h.DB.GetUserPublicProfileById(r.Context(), userId)
+	profile, err := h.DB.GetUserPublicProfileById(r.Context(), database.GetUserPublicProfileByIdParams{
+		ViewerID: viewerID,
+		ID:       userId,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
 		return
@@ -359,9 +371,12 @@ func toUser(user database.User) User {
 
 func toUserPublicProfile(p database.GetUserPublicProfileByIdRow) UserPublicProfile {
 	return UserPublicProfile{
-		ID:           p.ID,
-		Username:     p.Username,
-		RecipesCount: p.RecipesCount,
-		CreatedAt:    p.CreatedAt,
+		ID:             p.ID,
+		Username:       p.Username,
+		RecipesCount:   p.RecipesCount,
+		FollowersCount: p.FollowersCount,
+		FollowingCount: p.FollowingCount,
+		FollowedByMe:   p.FollowedByMe,
+		CreatedAt:      p.CreatedAt,
 	}
 }

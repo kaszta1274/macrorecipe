@@ -15,6 +15,7 @@ func TestRecipes(t *testing.T) {
 	alice := testSeed.Users[0]
 	bob := testSeed.Users[1]
 	aliceRecipe := testSeed.Recipes[0] // Chicken and Rice Bowl: 2 portions, 4 ingredients, 1 like (bob), 2 comments
+	bobRecipe := testSeed.Recipes[2]   // Baked Salmon with Sweet Potato (alice follows bob & likes it)
 
 	chicken := testSeed.Ingredients["Chicken Breast"]
 	oliveOil := testSeed.Ingredients["Olive Oil"]
@@ -155,6 +156,29 @@ func TestRecipes(t *testing.T) {
 			http.MethodGet, "/api/users/recipes", aliceToken, nil,
 			http.StatusOK,
 			assertRecipeSummaryAuthor(alice.ID, alice.Username, 2),
+		},
+		{
+			"alice feed returns followed user recipes",
+			http.MethodGet, "/api/recipes/feed", aliceToken, nil,
+			http.StatusOK,
+			func(t *testing.T, rec *httptest.ResponseRecorder) {
+				got := decodeJSON[[]handler.RecipeSummary](t, rec)
+				if len(got) != 1 || got[0].ID != bobRecipe.ID {
+					t.Fatalf("feed = %+v, want [%s]", got, bobRecipe.ID)
+				}
+				if got[0].Author.ID != bob.ID || got[0].Author.Username != bob.Username {
+					t.Fatalf("feed author = %+v, want (%s, %q)", got[0].Author, bob.ID, bob.Username)
+				}
+				if !got[0].LikedByMe || got[0].LikesCount != 1 || got[0].MacrosPerPortion.Calories <= 0 {
+					t.Fatalf("unexpected feed summary: %+v", got[0])
+				}
+			},
+		},
+		{
+			"bob feed empty when following nobody",
+			http.MethodGet, "/api/recipes/feed", bobToken, nil,
+			http.StatusOK,
+			assertRecipeSummaryCount(0),
 		},
 		{
 			"alice update own",

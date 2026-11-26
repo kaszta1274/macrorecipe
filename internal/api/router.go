@@ -30,6 +30,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 	recipeIngredientHandler := handler.NewRecipeIngredientHandler(cfg.DB)
 	likeHandler := handler.NewLikeHandler(cfg.DB)
 	commentHandler := handler.NewCommentHandler(cfg.DB)
+	followHandler := handler.NewFollowHandler(cfg.DB)
 
 	authLimiter := appmw.RateLimitByIP(10, time.Minute)
 	sensitiveLimiter := appmw.RateLimitByUser(5, time.Minute)
@@ -61,6 +62,10 @@ func (cfg *ApiConfig) Router() http.Handler {
 			r.Get("/users/{id}", userHandler.GetUserById)
 			r.Get("/users/{id}/recipes", recipeHandler.ListRecipesByUserId)
 			r.Get("/users/{id}/likes", likeHandler.ListLikesByUserId)
+			r.Post("/users/{id}/follow", followHandler.CreateFollow)
+			r.Delete("/users/{id}/follow", followHandler.DeleteFollow)
+			r.Get("/users/{id}/followers", followHandler.ListFollowersByUserId)
+			r.Get("/users/{id}/following", followHandler.ListFollowingsByUserId)
 			r.Get("/users/recipes", recipeHandler.ListMyRecipes)
 			r.Patch("/users/profile", userHandler.UpdateUsername)
 
@@ -68,6 +73,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 			r.Get("/ingredients", ingredientHandler.ListIngredients)
 
 			r.Post("/recipes", recipeHandler.CreateRecipe)
+			r.Get("/recipes/feed", recipeHandler.ListFeedRecipes)
 			r.Get("/recipes/{id}", recipeHandler.GetRecipeById)
 			r.Get("/recipes", recipeHandler.ListRecipesByName)
 			r.Put("/recipes/{id}", recipeHandler.UpdateRecipe)

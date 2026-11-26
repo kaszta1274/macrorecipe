@@ -26,9 +26,15 @@ SELECT
     u.id,
     u.username,
     u.created_at,
-    (SELECT COUNT(*) FROM recipes r WHERE r.user_id = u.id)::bigint AS recipes_count
+    (SELECT COUNT(*) FROM recipes r WHERE r.user_id = u.id)::bigint AS recipes_count,
+    (SELECT COUNT(*) FROM follows f WHERE f.following_id = u.id)::bigint AS followers_count,
+    (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id)::bigint AS following_count,
+    EXISTS (
+        SELECT 1 FROM follows vf
+        WHERE vf.follower_id = sqlc.arg('viewer_id')::uuid AND vf.following_id = u.id 
+    ) AS followed_by_me
 FROM users u
-WHERE u.id = $1;
+WHERE u.id = sqlc.arg('id')::uuid;
 
 -- name: UpdateUser :one
 UPDATE users

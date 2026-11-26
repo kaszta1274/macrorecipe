@@ -41,6 +41,11 @@ type seedComment struct {
 	body        string
 }
 
+type seedFollow struct {
+	followerIndex  int
+	followingIndex int
+}
+
 // Per-100g macros for starter ingredients seeded in prod and dev modes.
 var starterIngredients = []database.CreateIngredientParams{
 	{Name: "Chicken Breast", Protein: 31.0, Fat: 3.6, Carbohydrates: 0.0},
@@ -112,4 +117,8 @@ var testComments = []seedComment{
 	{userIndex: 0, recipeIndex: 0, body: "Great for weekly meal prep."},
 	{userIndex: 1, recipeIndex: 0, body: "Tried this with brown rice and it turned out awesome!"},
 	{userIndex: 0, recipeIndex: 2, body: "Crispy sweet potatoes make this recipe."},
+}
+
+var testFollows = []seedFollow{
+	{followerIndex: 0, followingIndex: 1}, // alice follows bob
 }

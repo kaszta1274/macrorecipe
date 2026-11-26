@@ -201,5 +201,8 @@ func TestSeederIdempotency(t *testing.T) {
 		if len(again.Comments) != len(testSeed.Comments) || again.Comments[0].ID != testSeed.Comments[0].ID {
 			t.Fatalf("comments not idempotent: got %+v", again.Comments)
 		}
+		if len(again.Follows) != len(testSeed.Follows) || again.Follows[0].FollowingID != testSeed.Follows[0].FollowingID {
+			t.Fatalf("follows not idempotent: got %+v", again.Follows)
+		}
 	})
 }

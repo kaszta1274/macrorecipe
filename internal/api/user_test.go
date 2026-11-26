@@ -71,8 +71,24 @@ func TestUsers(t *testing.T) {
 				if got.ID != alice.ID || got.Username != alice.Username {
 					t.Fatalf("profile = %+v, want (%s, %q)", got, alice.ID, alice.Username)
 				}
-				if got.RecipesCount != 2 {
-					t.Fatalf("recipes_count = %d, want 2", got.RecipesCount)
+				if got.RecipesCount != 2 || got.FollowersCount != 0 || got.FollowingCount != 1 || got.FollowedByMe {
+					t.Fatalf("alice counts = (recipes=%d followers=%d following=%d followed_by_me=%v), want (2, 0, 1, false)",
+						got.RecipesCount, got.FollowersCount, got.FollowingCount, got.FollowedByMe)
+				}
+			},
+		},
+		{
+			"get bob public profile as alice sees followed_by_me true",
+			http.MethodGet, "/api/users/" + bob.ID.String(), aliceToken, nil,
+			http.StatusOK,
+			func(t *testing.T, rec *httptest.ResponseRecorder) {
+				got := decodeJSON[handler.UserPublicProfile](t, rec)
+				if got.ID != bob.ID || got.Username != bob.Username {
+					t.Fatalf("profile = %+v, want (%s, %q)", got, bob.ID, bob.Username)
+				}
+				if got.RecipesCount != 1 || got.FollowersCount != 1 || got.FollowingCount != 0 || !got.FollowedByMe {
+					t.Fatalf("bob counts = (recipes=%d followers=%d following=%d followed_by_me=%v), want (1, 1, 0, true)",
+						got.RecipesCount, got.FollowersCount, got.FollowingCount, got.FollowedByMe)
 				}
 			},
 		},
