@@ -9,11 +9,13 @@ import (
 	"github.com/kaszta1274/macrorecipe/internal/api/handler"
 	appmw "github.com/kaszta1274/macrorecipe/internal/api/middleware"
 	"github.com/kaszta1274/macrorecipe/internal/database"
+	"github.com/kaszta1274/macrorecipe/internal/storage"
 )
 
 type ApiConfig struct {
 	DB          *database.Queries
 	TokenSecret string
+	UploadDir   string
 }
 
 func (cfg *ApiConfig) Router() http.Handler {
@@ -24,9 +26,11 @@ func (cfg *ApiConfig) Router() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	userHandler := handler.NewUserHandler(cfg.DB, cfg.TokenSecret)
+	store := storage.NewLocalStorage(cfg.UploadDir)
+
+	userHandler := handler.NewUserHandler(cfg.DB, cfg.TokenSecret, store)
 	ingredientHandler := handler.NewIngredientHandler(cfg.DB, cfg.TokenSecret)
-	recipeHandler := handler.NewRecipeHandler(cfg.DB)
+	recipeHandler := handler.NewRecipeHandler(cfg.DB, store)
 	recipeIngredientHandler := handler.NewRecipeIngredientHandler(cfg.DB)
 	likeHandler := handler.NewLikeHandler(cfg.DB)
 	commentHandler := handler.NewCommentHandler(cfg.DB)
@@ -34,11 +38,13 @@ func (cfg *ApiConfig) Router() http.Handler {
 
 	authLimiter := appmw.RateLimitByIP(10, time.Minute)
 	sensitiveLimiter := appmw.RateLimitByUser(5, time.Minute)
+	uploadLimiter := appmw.RateLimitByUser(20, time.Minute)
 	apiLimiter := appmw.RateLimitByUser(100, time.Minute)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", store.FileServer()))
 
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Use(authLimiter)
@@ -56,6 +62,12 @@ func (cfg *ApiConfig) Router() http.Handler {
 		})
 
 		r.Group(func(r chi.Router) {
+			r.Use(uploadLimiter)
+			r.Put("/users/avatar", userHandler.UpdateAvatar)
+			r.Put("/recipes/{id}/image", recipeHandler.UpdateRecipeImage)
+		})
+
+		r.Group(func(r chi.Router) {
 			r.Use(apiLimiter)
 
 			r.Get("/users/me", userHandler.GetMe)
@@ -68,6 +80,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 			r.Get("/users/{id}/following", followHandler.ListFollowingsByUserId)
 			r.Get("/users/recipes", recipeHandler.ListMyRecipes)
 			r.Patch("/users/profile", userHandler.UpdateUsername)
+			r.Delete("/users/avatar", userHandler.DeleteAvatar)
 
 			r.Get("/ingredients/{id}", ingredientHandler.GetIngredientById)
 			r.Get("/ingredients", ingredientHandler.ListIngredients)
@@ -78,6 +91,7 @@ func (cfg *ApiConfig) Router() http.Handler {
 			r.Get("/recipes", recipeHandler.ListRecipesByName)
 			r.Put("/recipes/{id}", recipeHandler.UpdateRecipe)
 			r.Delete("/recipes/{id}", recipeHandler.DeleteRecipe)
+			r.Delete("/recipes/{id}/image", recipeHandler.DeleteRecipeImage)
 
 			r.Post("/recipes/{recipe_id}/ingredients", recipeIngredientHandler.CreateRecipeIngredient)
 			r.Get("/recipes/{recipe_id}/ingredients", recipeIngredientHandler.ListRecipeIngredientsByRecipeId)

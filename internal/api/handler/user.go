@@ -13,6 +13,7 @@ import (
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/auth"
 	"github.com/kaszta1274/macrorecipe/internal/database"
+	"github.com/kaszta1274/macrorecipe/internal/storage"
 	"github.com/lib/pq"
 	"github.com/lib/pq/pqerror"
 )
@@ -22,18 +23,21 @@ type User struct {
 	Email     string            `json:"email"`
 	Username  string            `json:"username"`
 	Role      database.UserRole `json:"role"`
+	AvatarURL *string           `json:"avatar_url"`
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 type UserSummary struct {
-	ID       uuid.UUID `json:"id"`
-	Username string    `json:"username"`
+	ID        uuid.UUID `json:"id"`
+	Username  string    `json:"username"`
+	AvatarURL *string   `json:"avatar_url"`
 }
 
 type UserPublicProfile struct {
 	ID             uuid.UUID `json:"id"`
 	Username       string    `json:"username"`
+	AvatarURL      *string   `json:"avatar_url"`
 	RecipesCount   int64     `json:"recipes_count"`
 	FollowersCount int64     `json:"followers_count"`
 	FollowingCount int64     `json:"following_count"`
@@ -73,12 +77,14 @@ type UserLoginResponse struct {
 type UserHandler struct {
 	DB          *database.Queries
 	TokenSecret string
+	Storage     *storage.LocalStorage
 }
 
-func NewUserHandler(db *database.Queries, tokenSecret string) *UserHandler {
+func NewUserHandler(db *database.Queries, tokenSecret string, store *storage.LocalStorage) *UserHandler {
 	return &UserHandler{
 		DB:          db,
 		TokenSecret: tokenSecret,
+		Storage:     store,
 	}
 }
 
@@ -125,6 +131,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Email:     user.Email,
 		Username:  user.Username,
 		Role:      user.Role,
+		AvatarURL: nullStringPtr(user.AvatarUrl),
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 	})
@@ -253,6 +260,7 @@ func (h *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 		Email:     updatedUser.Email,
 		Username:  updatedUser.Username,
 		Role:      updatedUser.Role,
+		AvatarURL: nullStringPtr(updatedUser.AvatarUrl),
 		CreatedAt: updatedUser.CreatedAt,
 		UpdatedAt: updatedUser.UpdatedAt,
 	})
@@ -311,9 +319,83 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		Email:     updatedUser.Email,
 		Username:  updatedUser.Username,
 		Role:      updatedUser.Role,
+		AvatarURL: nullStringPtr(updatedUser.AvatarUrl),
 		CreatedAt: updatedUser.CreatedAt,
 		UpdatedAt: updatedUser.UpdatedAt,
 	})
+}
+
+func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
+	userId, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
+	user, err := h.DB.GetUserById(r.Context(), userId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
+		return
+	}
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get user", err)
+		return
+	}
+
+	newURL, ok := saveImageOrRespond(w, r, h.Storage, "avatars")
+	if !ok {
+		return
+	}
+
+	updated, err := h.DB.UpdateUserAvatar(r.Context(), database.UpdateUserAvatarParams{
+		ID:        user.ID,
+		AvatarUrl: sql.NullString{String: newURL, Valid: true},
+	})
+	if err != nil {
+		deleteImageBestEffort(r.Context(), h.Storage, newURL)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not update avatar", err)
+		return
+	}
+
+	if user.AvatarUrl.Valid {
+		deleteImageBestEffort(r.Context(), h.Storage, user.AvatarUrl.String)
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, map[string]*string{
+		"avatar_url": nullStringPtr(updated.AvatarUrl),
+	})
+}
+
+func (h *UserHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
+	userId, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get user id", nil)
+		return
+	}
+
+	user, err := h.DB.GetUserById(r.Context(), userId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "user not found", nil)
+		return
+	}
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get user", err)
+		return
+	}
+
+	if _, err := h.DB.UpdateUserAvatar(r.Context(), database.UpdateUserAvatarParams{
+		ID:        user.ID,
+		AvatarUrl: sql.NullString{},
+	}); err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not delete avatar", err)
+		return
+	}
+
+	if user.AvatarUrl.Valid {
+		deleteImageBestEffort(r.Context(), h.Storage, user.AvatarUrl.String)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -354,6 +436,9 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not delete user", err)
 		return
 	}
+	if user.AvatarUrl.Valid {
+		deleteImageBestEffort(r.Context(), h.Storage, user.AvatarUrl.String)
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -364,6 +449,7 @@ func toUser(user database.User) User {
 		Email:     user.Email,
 		Username:  user.Username,
 		Role:      user.Role,
+		AvatarURL: nullStringPtr(user.AvatarUrl),
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 	}
@@ -373,6 +459,7 @@ func toUserPublicProfile(p database.GetUserPublicProfileByIdRow) UserPublicProfi
 	return UserPublicProfile{
 		ID:             p.ID,
 		Username:       p.Username,
+		AvatarURL:      nullStringPtr(p.AvatarUrl),
 		RecipesCount:   p.RecipesCount,
 		FollowersCount: p.FollowersCount,
 		FollowingCount: p.FollowingCount,

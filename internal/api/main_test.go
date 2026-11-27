@@ -110,6 +110,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	cfg := api.ApiConfig{
 		DB:          newTestTxQueries(t),
 		TokenSecret: testTokenSecret,
+		UploadDir:   t.TempDir(),
 	}
 	return cfg.Router()
 }

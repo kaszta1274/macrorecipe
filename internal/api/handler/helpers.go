@@ -1,6 +1,17 @@
 package handler
 
-import "math"
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"log/slog"
+	"math"
+	"net/http"
+
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/kaszta1274/macrorecipe/internal/api/response"
+	"github.com/kaszta1274/macrorecipe/internal/storage"
+)
 
 type Macros struct {
 	Calories      float32 `json:"calories"`
@@ -32,6 +43,40 @@ func calculateMacrosPerPortion(protein, fat, carbs float64, portions int) Macros
 
 func round1(v float64) float32 {
 	return float32(math.Round(v*10) / 10)
+}
+
+func nullStringPtr(ns sql.NullString) *string {
+	if !ns.Valid {
+		return nil
+	}
+	s := ns.String
+	return &s
+}
+
+func saveImageOrRespond(w http.ResponseWriter, r *http.Request, store *storage.LocalStorage, subdir string) (string, bool) {
+	urlPath, err := store.SaveImage(w, r, "image", subdir)
+	if err == nil {
+		return urlPath, true
+	}
+	switch {
+	case errors.Is(err, storage.ErrFileTooLarge):
+		response.RespondWithError(w, r, http.StatusRequestEntityTooLarge, err.Error(), err)
+	case errors.Is(err, storage.ErrInvalidImageType), errors.Is(err, storage.ErrMissingFile):
+		response.RespondWithError(w, r, http.StatusBadRequest, err.Error(), err)
+	default:
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not save image", err)
+	}
+	return "", false
+}
+
+func deleteImageBestEffort(ctx context.Context, store *storage.LocalStorage, urlPath string) {
+	if err := store.Delete(urlPath); err != nil {
+		slog.WarnContext(ctx, "could not delete image file",
+			slog.String("request_id", middleware.GetReqID(ctx)),
+			slog.String("path", urlPath),
+			slog.Any("error", err),
+		)
+	}
 }
 
 func mapSlice[In, Out any](in []In, fn func(In) Out) []Out {

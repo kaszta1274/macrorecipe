@@ -189,7 +189,7 @@ func toFollow(f database.Follow) Follow {
 }
 
 func toFollowerItem(r database.ListFollowersByUserIdRow) UserListItem {
-	summary := UserSummary{ID: r.ID, Username: r.Username}
+	summary := UserSummary{ID: r.ID, Username: r.Username, AvatarURL: nullStringPtr(r.AvatarUrl)}
 	return UserListItem{
 		UserSummary:  summary,
 		FollowedAt:   r.FollowedAt,
@@ -198,7 +198,7 @@ func toFollowerItem(r database.ListFollowersByUserIdRow) UserListItem {
 }
 
 func toFollowingItem(r database.ListFollowingsByUserIdRow) UserListItem {
-	summary := UserSummary{ID: r.ID, Username: r.Username}
+	summary := UserSummary{ID: r.ID, Username: r.Username, AvatarURL: nullStringPtr(r.AvatarUrl)}
 	return UserListItem{
 		UserSummary:  summary,
 		FollowedAt:   r.FollowedAt,

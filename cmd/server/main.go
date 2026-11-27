@@ -50,11 +50,14 @@ func main() {
 		log.Fatalf("database ping failed: %s", err)
 	}
 
+	uploadDir := os.Getenv("UPLOAD_DIR")
+
 	dbQueries := database.New(db)
 
 	cfg := api.ApiConfig{
 		DB:          dbQueries,
 		TokenSecret: tokenSecret,
+		UploadDir:   uploadDir,
 	}
 
 	r := cfg.Router()
@@ -65,7 +68,7 @@ func main() {
 	srv := &http.Server{
 		Addr:         ":" + port,
 		Handler:      r,
-		ReadTimeout:  5 * time.Second,
+		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}

@@ -32,6 +32,7 @@ type CommentsByRecipeId struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`
 	Username  string    `json:"username"`
+	AvatarURL *string   `json:"avatar_url"`
 	RecipeID  uuid.UUID `json:"recipe_id"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
@@ -233,6 +234,7 @@ func toRecipeComment(comment database.ListCommentsByRecipeIdRow) CommentsByRecip
 		ID:        comment.ID,
 		UserID:    comment.UserID,
 		Username:  comment.Username,
+		AvatarURL: nullStringPtr(comment.AvatarUrl),
 		RecipeID:  comment.RecipeID,
 		Body:      comment.Body,
 		CreatedAt: comment.CreatedAt,

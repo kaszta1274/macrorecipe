@@ -13,6 +13,7 @@ import (
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/auth"
 	"github.com/kaszta1274/macrorecipe/internal/database"
+	"github.com/kaszta1274/macrorecipe/internal/storage"
 )
 
 type Recipe struct {
@@ -22,6 +23,7 @@ type Recipe struct {
 	Description  string    `json:"description"`
 	Instructions string    `json:"instructions"`
 	Portions     int       `json:"portions"`
+	ImageURL     *string   `json:"image_url"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -31,6 +33,7 @@ type RecipeSummary struct {
 	Name             string      `json:"name"`
 	Description      string      `json:"description"`
 	Portions         int         `json:"portions"`
+	ImageURL         *string     `json:"image_url"`
 	Author           UserSummary `json:"author"`
 	MacrosPerPortion Macros      `json:"macros_per_portion"`
 	LikesCount       int64       `json:"likes_count"`
@@ -55,12 +58,14 @@ type RecipeRequest struct {
 }
 
 type RecipeHandler struct {
-	DB *database.Queries
+	DB      *database.Queries
+	Storage *storage.LocalStorage
 }
 
-func NewRecipeHandler(db *database.Queries) *RecipeHandler {
+func NewRecipeHandler(db *database.Queries, store *storage.LocalStorage) *RecipeHandler {
 	return &RecipeHandler{
-		DB: db,
+		DB:      db,
+		Storage: store,
 	}
 }
 
@@ -305,6 +310,99 @@ func (h *RecipeHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request) {
 	response.RespondWithJSON(w, http.StatusOK, toRecipe(updatedRecipe))
 }
 
+func (h *RecipeHandler) UpdateRecipeImage(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := auth.FromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get auth ctx", nil)
+		return
+	}
+
+	recipeId, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid recipe id format", err)
+		return
+	}
+
+	recipe, err := h.DB.GetRecipeById(r.Context(), recipeId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "recipe not found", nil)
+		return
+	}
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get recipe", err)
+		return
+	}
+	if authCtx.Role != database.UserRoleAdmin && recipe.UserID != authCtx.UserID {
+		response.RespondWithError(w, r, http.StatusForbidden, "you do not have permission to modify this recipe", nil)
+		return
+	}
+
+	newURL, ok := saveImageOrRespond(w, r, h.Storage, "recipes")
+	if !ok {
+		return
+	}
+
+	updated, err := h.DB.UpdateRecipeImage(r.Context(), database.UpdateRecipeImageParams{
+		ID:       recipe.ID,
+		ImageUrl: sql.NullString{String: newURL, Valid: true},
+	})
+	if err != nil {
+		deleteImageBestEffort(r.Context(), h.Storage, newURL)
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not update recipe image", err)
+		return
+	}
+
+	if recipe.ImageUrl.Valid {
+		deleteImageBestEffort(r.Context(), h.Storage, recipe.ImageUrl.String)
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, map[string]*string{
+		"image_url": nullStringPtr(updated.ImageUrl),
+	})
+}
+
+func (h *RecipeHandler) DeleteRecipeImage(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := auth.FromContext(r.Context())
+	if !ok {
+		response.RespondWithError(w, r, http.StatusUnauthorized, "could not get auth ctx", nil)
+		return
+	}
+
+	recipeId, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, "invalid recipe id format", err)
+		return
+	}
+
+	recipe, err := h.DB.GetRecipeById(r.Context(), recipeId)
+	if errors.Is(err, sql.ErrNoRows) {
+		response.RespondWithError(w, r, http.StatusNotFound, "recipe not found", nil)
+		return
+	}
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not get recipe", err)
+		return
+	}
+	if authCtx.Role != database.UserRoleAdmin && recipe.UserID != authCtx.UserID {
+		response.RespondWithError(w, r, http.StatusForbidden, "you do not have permission to modify this recipe", nil)
+		return
+	}
+
+	if _, err := h.DB.UpdateRecipeImage(r.Context(), database.UpdateRecipeImageParams{
+		ID:       recipe.ID,
+		ImageUrl: sql.NullString{},
+	}); err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, "could not delete recipe image", err)
+		return
+	}
+
+	if recipe.ImageUrl.Valid {
+		deleteImageBestEffort(r.Context(), h.Storage, recipe.ImageUrl.String)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *RecipeHandler) DeleteRecipe(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := auth.FromContext(r.Context())
 	if !ok {
@@ -343,6 +441,9 @@ func (h *RecipeHandler) DeleteRecipe(w http.ResponseWriter, r *http.Request) {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not delete recipe", err)
 		return
 	}
+	if recipe.ImageUrl.Valid {
+		deleteImageBestEffort(r.Context(), h.Storage, recipe.ImageUrl.String)
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -378,6 +479,7 @@ func toRecipe(recipe database.Recipe) Recipe {
 		Description:  recipe.Description,
 		Instructions: recipe.Instructions,
 		Portions:     int(recipe.Portions),
+		ImageURL:     nullStringPtr(recipe.ImageUrl),
 		CreatedAt:    recipe.CreatedAt,
 		UpdatedAt:    recipe.UpdatedAt,
 	}
@@ -397,7 +499,8 @@ func toRecipeDetail(recipe database.GetRecipeDetailByIdRow, ingredients []databa
 		Name:             recipe.Name,
 		Description:      recipe.Description,
 		Portions:         portions,
-		Author:           UserSummary{ID: recipe.AuthorID, Username: recipe.AuthorUsername},
+		ImageURL:         nullStringPtr(recipe.ImageUrl),
+		Author:           UserSummary{ID: recipe.AuthorID, Username: recipe.AuthorUsername, AvatarURL: nullStringPtr(recipe.AuthorAvatarUrl)},
 		MacrosPerPortion: calculateMacrosPerPortion(totalProtein, totalFat, totalCarbs, portions),
 		LikesCount:       recipe.LikesCount,
 		LikedByMe:        recipe.LikedByMe,
@@ -421,7 +524,8 @@ func toRecipeSummary(r database.ListRecipeSummariesRow) RecipeSummary {
 		Name:             r.Name,
 		Description:      r.Description,
 		Portions:         portions,
-		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername},
+		ImageURL:         nullStringPtr(r.ImageUrl),
+		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername, AvatarURL: nullStringPtr(r.AuthorAvatarUrl)},
 		MacrosPerPortion: calculateMacrosPerPortion(float64(r.TotalProtein), float64(r.TotalFat), float64(r.TotalCarbs), portions),
 		LikesCount:       r.LikesCount,
 		LikedByMe:        r.LikedByMe,
@@ -438,7 +542,8 @@ func toFeedRecipeSummary(r database.ListFeedRecipesRow) RecipeSummary {
 		Name:             r.Name,
 		Description:      r.Description,
 		Portions:         portions,
-		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername},
+		ImageURL:         nullStringPtr(r.ImageUrl),
+		Author:           UserSummary{ID: r.AuthorID, Username: r.AuthorUsername, AvatarURL: nullStringPtr(r.AuthorAvatarUrl)},
 		MacrosPerPortion: calculateMacrosPerPortion(float64(r.TotalProtein), float64(r.TotalFat), float64(r.TotalCarbs), portions),
 		LikesCount:       r.LikesCount,
 		LikedByMe:        r.LikedByMe,
