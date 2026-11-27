@@ -75,67 +75,45 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, username, password_hash, role, avatar_url, created_at, updated_at
+SELECT id, email, username, password_hash, role, created_at, updated_at, avatar_url
 FROM users
 WHERE email = $1
 `
 
-type GetUserByEmailRow struct {
-	ID           uuid.UUID
-	Email        string
-	Username     string
-	PasswordHash string
-	Role         UserRole
-	AvatarUrl    sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
-	var i GetUserByEmailRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
-		&i.AvatarUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, email, username, password_hash, role, avatar_url, created_at, updated_at
+SELECT id, email, username, password_hash, role, created_at, updated_at, avatar_url
 FROM users
 WHERE id = $1
 `
 
-type GetUserByIdRow struct {
-	ID           uuid.UUID
-	Email        string
-	Username     string
-	PasswordHash string
-	Role         UserRole
-	AvatarUrl    sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (GetUserByIdRow, error) {
+func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserById, id)
-	var i GetUserByIdRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
-		&i.AvatarUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
 	)
 	return i, err
 }

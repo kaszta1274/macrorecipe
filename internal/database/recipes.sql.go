@@ -26,7 +26,7 @@ VALUES (
     NOW(),
     NOW()
 )
-RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 `
 
 type CreateRecipeParams struct {
@@ -37,19 +37,7 @@ type CreateRecipeParams struct {
 	Portions     int16
 }
 
-type CreateRecipeRow struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Name         string
-	Description  string
-	Instructions string
-	Portions     int16
-	ImageUrl     sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (CreateRecipeRow, error) {
+func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Recipe, error) {
 	row := q.db.QueryRowContext(ctx, createRecipe,
 		arg.UserID,
 		arg.Name,
@@ -57,7 +45,7 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Cre
 		arg.Instructions,
 		arg.Portions,
 	)
-	var i CreateRecipeRow
+	var i Recipe
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -65,9 +53,9 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Cre
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
-		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ImageUrl,
 	)
 	return i, err
 }
@@ -83,26 +71,14 @@ func (q *Queries) DeleteRecipe(ctx context.Context, id uuid.UUID) error {
 }
 
 const getRecipeById = `-- name: GetRecipeById :one
-SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 FROM recipes
 WHERE id = $1
 `
 
-type GetRecipeByIdRow struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Name         string
-	Description  string
-	Instructions string
-	Portions     int16
-	ImageUrl     sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (GetRecipeByIdRow, error) {
+func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (Recipe, error) {
 	row := q.db.QueryRowContext(ctx, getRecipeById, id)
-	var i GetRecipeByIdRow
+	var i Recipe
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -110,9 +86,9 @@ func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (GetRecipeByI
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
-		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ImageUrl,
 	)
 	return i, err
 }
@@ -440,7 +416,7 @@ func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummari
 }
 
 const listRecipesByUserId = `-- name: ListRecipesByUserId :many
-SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 FROM recipes
 WHERE user_id = $1 AND name ILIKE '%' || $4::text || '%'
 ORDER BY name ASC
@@ -454,19 +430,7 @@ type ListRecipesByUserIdParams struct {
 	SearchQuery string
 }
 
-type ListRecipesByUserIdRow struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Name         string
-	Description  string
-	Instructions string
-	Portions     int16
-	ImageUrl     sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUserIdParams) ([]ListRecipesByUserIdRow, error) {
+func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUserIdParams) ([]Recipe, error) {
 	rows, err := q.db.QueryContext(ctx, listRecipesByUserId,
 		arg.UserID,
 		arg.Limit,
@@ -477,9 +441,9 @@ func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUser
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListRecipesByUserIdRow
+	var items []Recipe
 	for rows.Next() {
-		var i ListRecipesByUserIdRow
+		var i Recipe
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -487,9 +451,9 @@ func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUser
 			&i.Description,
 			&i.Instructions,
 			&i.Portions,
-			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ImageUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -508,7 +472,7 @@ const updateRecipe = `-- name: UpdateRecipe :one
 UPDATE recipes
 SET name = $2, description = $3, instructions = $4, portions = $5, updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 `
 
 type UpdateRecipeParams struct {
@@ -519,19 +483,7 @@ type UpdateRecipeParams struct {
 	Portions     int16
 }
 
-type UpdateRecipeRow struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Name         string
-	Description  string
-	Instructions string
-	Portions     int16
-	ImageUrl     sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (UpdateRecipeRow, error) {
+func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Recipe, error) {
 	row := q.db.QueryRowContext(ctx, updateRecipe,
 		arg.ID,
 		arg.Name,
@@ -539,7 +491,7 @@ func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Upd
 		arg.Instructions,
 		arg.Portions,
 	)
-	var i UpdateRecipeRow
+	var i Recipe
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -547,9 +499,9 @@ func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Upd
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
-		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ImageUrl,
 	)
 	return i, err
 }
@@ -558,7 +510,7 @@ const updateRecipeImage = `-- name: UpdateRecipeImage :one
 UPDATE recipes
 SET image_url = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 `
 
 type UpdateRecipeImageParams struct {
@@ -566,21 +518,9 @@ type UpdateRecipeImageParams struct {
 	ImageUrl sql.NullString
 }
 
-type UpdateRecipeImageRow struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Name         string
-	Description  string
-	Instructions string
-	Portions     int16
-	ImageUrl     sql.NullString
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-func (q *Queries) UpdateRecipeImage(ctx context.Context, arg UpdateRecipeImageParams) (UpdateRecipeImageRow, error) {
+func (q *Queries) UpdateRecipeImage(ctx context.Context, arg UpdateRecipeImageParams) (Recipe, error) {
 	row := q.db.QueryRowContext(ctx, updateRecipeImage, arg.ID, arg.ImageUrl)
-	var i UpdateRecipeImageRow
+	var i Recipe
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -588,9 +528,9 @@ func (q *Queries) UpdateRecipeImage(ctx context.Context, arg UpdateRecipeImagePa
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
-		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ImageUrl,
 	)
 	return i, err
 }

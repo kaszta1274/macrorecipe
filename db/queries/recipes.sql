@@ -10,10 +10,10 @@ VALUES (
     NOW(),
     NOW()
 )
-RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at;
+RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at, image_url;
 
 -- name: GetRecipeById :one
-SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 FROM recipes
 WHERE id = $1;
 
@@ -153,7 +153,7 @@ LEFT JOIN LATERAL (
 ORDER BY p.created_at DESC, p.id ASC;
 
 -- name: ListRecipesByUserId :many
-SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, created_at, updated_at, image_url
 FROM recipes
 WHERE user_id = $1 AND name ILIKE '%' || sqlc.arg('search_query')::text || '%'
 ORDER BY name ASC
@@ -163,13 +163,13 @@ LIMIT $2 OFFSET $3;
 UPDATE recipes
 SET name = $2, description = $3, instructions = $4, portions = $5, updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at;
+RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at, image_url;
 
 -- name: UpdateRecipeImage :one
 UPDATE recipes
 SET image_url = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at;
+RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at, image_url;
 
 -- name: DeleteRecipe :exec
 DELETE FROM recipes

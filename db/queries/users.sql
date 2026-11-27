@@ -12,12 +12,12 @@ VALUES (
 RETURNING id, email, username, role, avatar_url, created_at, updated_at;
 
 -- name: GetUserByEmail :one
-SELECT id, email, username, password_hash, role, avatar_url, created_at, updated_at
+SELECT id, email, username, password_hash, role, created_at, updated_at, avatar_url
 FROM users
 WHERE email = $1;
 
 -- name: GetUserById :one
-SELECT id, email, username, password_hash, role, avatar_url, created_at, updated_at
+SELECT id, email, username, password_hash, role, created_at, updated_at, avatar_url
 FROM users
 WHERE id = $1;
 
