@@ -10,10 +10,10 @@ VALUES (
     NOW(),
     NOW()
 )
-RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at;
+RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at;
 
 -- name: GetRecipeById :one
-SELECT id, user_id, name, description, instructions, portions, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
 FROM recipes
 WHERE id = $1;
 
@@ -24,10 +24,12 @@ SELECT
     r.description,
     r.instructions,
     r.portions,
+    r.image_url,
     r.created_at,
     r.updated_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(l.likes_count, 0)::bigint AS likes_count,
     EXISTS (
         SELECT 1 FROM likes ul
@@ -46,7 +48,7 @@ WHERE r.id = sqlc.arg('id')::uuid;
 
 -- name: ListRecipeSummaries :many
 WITH page AS (
-    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.created_at, r.updated_at
+    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.image_url, r.created_at, r.updated_at
     FROM recipes r
     WHERE (sqlc.narg('author_id')::uuid IS NULL OR r.user_id = sqlc.narg('author_id')::uuid)
       AND r.name ILIKE '%' || sqlc.arg('search_query')::text || '%'
@@ -68,10 +70,12 @@ SELECT
     p.name,
     p.description,
     p.portions,
+    p.image_url,
     p.created_at,
     p.updated_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(m.protein, 0)::real AS total_protein,
     COALESCE(m.fat, 0)::real AS total_fat,
     COALESCE(m.carbs, 0)::real AS total_carbs,
@@ -102,7 +106,7 @@ ORDER BY p.created_at DESC, p.id ASC;
 
 -- name: ListFeedRecipes :many
 WITH page AS (
-    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.created_at, r.updated_at
+    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.image_url, r.created_at, r.updated_at
     FROM recipes r
     JOIN follows f ON f.following_id = r.user_id
     WHERE f.follower_id = sqlc.arg('viewer_id')::uuid
@@ -114,10 +118,12 @@ SELECT
     p.name,
     p.description,
     p.portions,
+    p.image_url,
     p.created_at,
     p.updated_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(m.protein, 0)::real AS total_protein,
     COALESCE(m.fat, 0)::real AS total_fat,
     COALESCE(m.carbs, 0)::real AS total_carbs,
@@ -147,7 +153,7 @@ LEFT JOIN LATERAL (
 ORDER BY p.created_at DESC, p.id ASC;
 
 -- name: ListRecipesByUserId :many
-SELECT id, user_id, name, description, instructions, portions, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
 FROM recipes
 WHERE user_id = $1 AND name ILIKE '%' || sqlc.arg('search_query')::text || '%'
 ORDER BY name ASC
@@ -157,7 +163,13 @@ LIMIT $2 OFFSET $3;
 UPDATE recipes
 SET name = $2, description = $3, instructions = $4, portions = $5, updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at;
+RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at;
+
+-- name: UpdateRecipeImage :one
+UPDATE recipes
+SET image_url = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at;
 
 -- name: DeleteRecipe :exec
 DELETE FROM recipes

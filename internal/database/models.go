@@ -5,6 +5,7 @@
 package database
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"time"
@@ -94,6 +95,7 @@ type Recipe struct {
 	Portions     int16
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	ImageUrl     sql.NullString
 }
 
 type RecipeIngredient struct {
@@ -112,4 +114,5 @@ type User struct {
 	Role         UserRole
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	AvatarUrl    sql.NullString
 }

@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,6 +81,7 @@ SELECT
     comments.id, 
     comments.user_id, 
     users.username,
+    users.avatar_url,
     comments.recipe_id, 
     comments.body, 
     comments.created_at, 
@@ -101,6 +103,7 @@ type ListCommentsByRecipeIdRow struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
 	Username  string
+	AvatarUrl sql.NullString
 	RecipeID  uuid.UUID
 	Body      string
 	CreatedAt time.Time
@@ -120,6 +123,7 @@ func (q *Queries) ListCommentsByRecipeId(ctx context.Context, arg ListCommentsBy
 			&i.ID,
 			&i.UserID,
 			&i.Username,
+			&i.AvatarUrl,
 			&i.RecipeID,
 			&i.Body,
 			&i.CreatedAt,

@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,6 +72,7 @@ const listFollowersByUserId = `-- name: ListFollowersByUserId :many
 SELECT 
     u.id,
     u.username,
+    u.avatar_url,
     f.created_at AS followed_at,
     EXISTS (
         SELECT 1 FROM follows vf
@@ -93,6 +95,7 @@ type ListFollowersByUserIdParams struct {
 type ListFollowersByUserIdRow struct {
 	ID           uuid.UUID
 	Username     string
+	AvatarUrl    sql.NullString
 	FollowedAt   time.Time
 	FollowedByMe bool
 }
@@ -114,6 +117,7 @@ func (q *Queries) ListFollowersByUserId(ctx context.Context, arg ListFollowersBy
 		if err := rows.Scan(
 			&i.ID,
 			&i.Username,
+			&i.AvatarUrl,
 			&i.FollowedAt,
 			&i.FollowedByMe,
 		); err != nil {
@@ -134,6 +138,7 @@ const listFollowingsByUserId = `-- name: ListFollowingsByUserId :many
 SELECT 
     u.id,
     u.username,
+    u.avatar_url,
     f.created_at AS followed_at,
     EXISTS (
         SELECT 1 FROM follows vf
@@ -156,6 +161,7 @@ type ListFollowingsByUserIdParams struct {
 type ListFollowingsByUserIdRow struct {
 	ID           uuid.UUID
 	Username     string
+	AvatarUrl    sql.NullString
 	FollowedAt   time.Time
 	FollowedByMe bool
 }
@@ -177,6 +183,7 @@ func (q *Queries) ListFollowingsByUserId(ctx context.Context, arg ListFollowings
 		if err := rows.Scan(
 			&i.ID,
 			&i.Username,
+			&i.AvatarUrl,
 			&i.FollowedAt,
 			&i.FollowedByMe,
 		); err != nil {

@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -93,11 +94,13 @@ SELECT
     r.name,
     r.description,
     r.portions,
+    r.image_url,
     r.created_at,
     r.updated_at,
     p.liked_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(m.protein, 0)::real AS total_protein,
     COALESCE(m.fat, 0)::real AS total_fat,
     COALESCE(m.carbs, 0)::real AS total_carbs,
@@ -136,21 +139,23 @@ type ListLikesByUserIdParams struct {
 }
 
 type ListLikesByUserIdRow struct {
-	ID             uuid.UUID
-	Name           string
-	Description    string
-	Portions       int16
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	LikedAt        time.Time
-	AuthorID       uuid.UUID
-	AuthorUsername string
-	TotalProtein   float32
-	TotalFat       float32
-	TotalCarbs     float32
-	LikesCount     int64
-	LikedByMe      bool
-	CommentsCount  int64
+	ID              uuid.UUID
+	Name            string
+	Description     string
+	Portions        int16
+	ImageUrl        sql.NullString
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	LikedAt         time.Time
+	AuthorID        uuid.UUID
+	AuthorUsername  string
+	AuthorAvatarUrl sql.NullString
+	TotalProtein    float32
+	TotalFat        float32
+	TotalCarbs      float32
+	LikesCount      int64
+	LikedByMe       bool
+	CommentsCount   int64
 }
 
 func (q *Queries) ListLikesByUserId(ctx context.Context, arg ListLikesByUserIdParams) ([]ListLikesByUserIdRow, error) {
@@ -172,11 +177,13 @@ func (q *Queries) ListLikesByUserId(ctx context.Context, arg ListLikesByUserIdPa
 			&i.Name,
 			&i.Description,
 			&i.Portions,
+			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.LikedAt,
 			&i.AuthorID,
 			&i.AuthorUsername,
+			&i.AuthorAvatarUrl,
 			&i.TotalProtein,
 			&i.TotalFat,
 			&i.TotalCarbs,

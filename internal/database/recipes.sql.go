@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,7 +26,7 @@ VALUES (
     NOW(),
     NOW()
 )
-RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at
+RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
 `
 
 type CreateRecipeParams struct {
@@ -36,7 +37,19 @@ type CreateRecipeParams struct {
 	Portions     int16
 }
 
-func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Recipe, error) {
+type CreateRecipeRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Name         string
+	Description  string
+	Instructions string
+	Portions     int16
+	ImageUrl     sql.NullString
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (CreateRecipeRow, error) {
 	row := q.db.QueryRowContext(ctx, createRecipe,
 		arg.UserID,
 		arg.Name,
@@ -44,7 +57,7 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 		arg.Instructions,
 		arg.Portions,
 	)
-	var i Recipe
+	var i CreateRecipeRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -52,6 +65,7 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
+		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -69,14 +83,26 @@ func (q *Queries) DeleteRecipe(ctx context.Context, id uuid.UUID) error {
 }
 
 const getRecipeById = `-- name: GetRecipeById :one
-SELECT id, user_id, name, description, instructions, portions, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
 FROM recipes
 WHERE id = $1
 `
 
-func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (Recipe, error) {
+type GetRecipeByIdRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Name         string
+	Description  string
+	Instructions string
+	Portions     int16
+	ImageUrl     sql.NullString
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (GetRecipeByIdRow, error) {
 	row := q.db.QueryRowContext(ctx, getRecipeById, id)
-	var i Recipe
+	var i GetRecipeByIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -84,6 +110,7 @@ func (q *Queries) GetRecipeById(ctx context.Context, id uuid.UUID) (Recipe, erro
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
+		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -97,10 +124,12 @@ SELECT
     r.description,
     r.instructions,
     r.portions,
+    r.image_url,
     r.created_at,
     r.updated_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(l.likes_count, 0)::bigint AS likes_count,
     EXISTS (
         SELECT 1 FROM likes ul
@@ -124,18 +153,20 @@ type GetRecipeDetailByIdParams struct {
 }
 
 type GetRecipeDetailByIdRow struct {
-	ID             uuid.UUID
-	Name           string
-	Description    string
-	Instructions   string
-	Portions       int16
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	AuthorID       uuid.UUID
-	AuthorUsername string
-	LikesCount     int64
-	LikedByMe      bool
-	CommentsCount  int64
+	ID              uuid.UUID
+	Name            string
+	Description     string
+	Instructions    string
+	Portions        int16
+	ImageUrl        sql.NullString
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AuthorID        uuid.UUID
+	AuthorUsername  string
+	AuthorAvatarUrl sql.NullString
+	LikesCount      int64
+	LikedByMe       bool
+	CommentsCount   int64
 }
 
 func (q *Queries) GetRecipeDetailById(ctx context.Context, arg GetRecipeDetailByIdParams) (GetRecipeDetailByIdRow, error) {
@@ -147,10 +178,12 @@ func (q *Queries) GetRecipeDetailById(ctx context.Context, arg GetRecipeDetailBy
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
+		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AuthorID,
 		&i.AuthorUsername,
+		&i.AuthorAvatarUrl,
 		&i.LikesCount,
 		&i.LikedByMe,
 		&i.CommentsCount,
@@ -160,7 +193,7 @@ func (q *Queries) GetRecipeDetailById(ctx context.Context, arg GetRecipeDetailBy
 
 const listFeedRecipes = `-- name: ListFeedRecipes :many
 WITH page AS (
-    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.created_at, r.updated_at
+    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.image_url, r.created_at, r.updated_at
     FROM recipes r
     JOIN follows f ON f.following_id = r.user_id
     WHERE f.follower_id = $1::uuid
@@ -172,10 +205,12 @@ SELECT
     p.name,
     p.description,
     p.portions,
+    p.image_url,
     p.created_at,
     p.updated_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(m.protein, 0)::real AS total_protein,
     COALESCE(m.fat, 0)::real AS total_fat,
     COALESCE(m.carbs, 0)::real AS total_carbs,
@@ -212,20 +247,22 @@ type ListFeedRecipesParams struct {
 }
 
 type ListFeedRecipesRow struct {
-	ID             uuid.UUID
-	Name           string
-	Description    string
-	Portions       int16
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	AuthorID       uuid.UUID
-	AuthorUsername string
-	TotalProtein   float32
-	TotalFat       float32
-	TotalCarbs     float32
-	LikesCount     int64
-	LikedByMe      bool
-	CommentsCount  int64
+	ID              uuid.UUID
+	Name            string
+	Description     string
+	Portions        int16
+	ImageUrl        sql.NullString
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AuthorID        uuid.UUID
+	AuthorUsername  string
+	AuthorAvatarUrl sql.NullString
+	TotalProtein    float32
+	TotalFat        float32
+	TotalCarbs      float32
+	LikesCount      int64
+	LikedByMe       bool
+	CommentsCount   int64
 }
 
 func (q *Queries) ListFeedRecipes(ctx context.Context, arg ListFeedRecipesParams) ([]ListFeedRecipesRow, error) {
@@ -242,10 +279,12 @@ func (q *Queries) ListFeedRecipes(ctx context.Context, arg ListFeedRecipesParams
 			&i.Name,
 			&i.Description,
 			&i.Portions,
+			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AuthorID,
 			&i.AuthorUsername,
+			&i.AuthorAvatarUrl,
 			&i.TotalProtein,
 			&i.TotalFat,
 			&i.TotalCarbs,
@@ -268,7 +307,7 @@ func (q *Queries) ListFeedRecipes(ctx context.Context, arg ListFeedRecipesParams
 
 const listRecipeSummaries = `-- name: ListRecipeSummaries :many
 WITH page AS (
-    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.created_at, r.updated_at
+    SELECT r.id, r.user_id, r.name, r.description, r.portions, r.image_url, r.created_at, r.updated_at
     FROM recipes r
     WHERE ($2::uuid IS NULL OR r.user_id = $2::uuid)
       AND r.name ILIKE '%' || $3::text || '%'
@@ -290,10 +329,12 @@ SELECT
     p.name,
     p.description,
     p.portions,
+    p.image_url,
     p.created_at,
     p.updated_at,
     u.id AS author_id,
     u.username AS author_username,
+    u.avatar_url AS author_avatar_url,
     COALESCE(m.protein, 0)::real AS total_protein,
     COALESCE(m.fat, 0)::real AS total_fat,
     COALESCE(m.carbs, 0)::real AS total_carbs,
@@ -333,20 +374,22 @@ type ListRecipeSummariesParams struct {
 }
 
 type ListRecipeSummariesRow struct {
-	ID             uuid.UUID
-	Name           string
-	Description    string
-	Portions       int16
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	AuthorID       uuid.UUID
-	AuthorUsername string
-	TotalProtein   float32
-	TotalFat       float32
-	TotalCarbs     float32
-	LikesCount     int64
-	LikedByMe      bool
-	CommentsCount  int64
+	ID              uuid.UUID
+	Name            string
+	Description     string
+	Portions        int16
+	ImageUrl        sql.NullString
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AuthorID        uuid.UUID
+	AuthorUsername  string
+	AuthorAvatarUrl sql.NullString
+	TotalProtein    float32
+	TotalFat        float32
+	TotalCarbs      float32
+	LikesCount      int64
+	LikedByMe       bool
+	CommentsCount   int64
 }
 
 func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummariesParams) ([]ListRecipeSummariesRow, error) {
@@ -370,10 +413,12 @@ func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummari
 			&i.Name,
 			&i.Description,
 			&i.Portions,
+			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AuthorID,
 			&i.AuthorUsername,
+			&i.AuthorAvatarUrl,
 			&i.TotalProtein,
 			&i.TotalFat,
 			&i.TotalCarbs,
@@ -395,7 +440,7 @@ func (q *Queries) ListRecipeSummaries(ctx context.Context, arg ListRecipeSummari
 }
 
 const listRecipesByUserId = `-- name: ListRecipesByUserId :many
-SELECT id, user_id, name, description, instructions, portions, created_at, updated_at
+SELECT id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
 FROM recipes
 WHERE user_id = $1 AND name ILIKE '%' || $4::text || '%'
 ORDER BY name ASC
@@ -409,7 +454,19 @@ type ListRecipesByUserIdParams struct {
 	SearchQuery string
 }
 
-func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUserIdParams) ([]Recipe, error) {
+type ListRecipesByUserIdRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Name         string
+	Description  string
+	Instructions string
+	Portions     int16
+	ImageUrl     sql.NullString
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUserIdParams) ([]ListRecipesByUserIdRow, error) {
 	rows, err := q.db.QueryContext(ctx, listRecipesByUserId,
 		arg.UserID,
 		arg.Limit,
@@ -420,9 +477,9 @@ func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUser
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Recipe
+	var items []ListRecipesByUserIdRow
 	for rows.Next() {
-		var i Recipe
+		var i ListRecipesByUserIdRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -430,6 +487,7 @@ func (q *Queries) ListRecipesByUserId(ctx context.Context, arg ListRecipesByUser
 			&i.Description,
 			&i.Instructions,
 			&i.Portions,
+			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -450,7 +508,7 @@ const updateRecipe = `-- name: UpdateRecipe :one
 UPDATE recipes
 SET name = $2, description = $3, instructions = $4, portions = $5, updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, name, description, instructions, portions, created_at, updated_at
+RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
 `
 
 type UpdateRecipeParams struct {
@@ -461,7 +519,19 @@ type UpdateRecipeParams struct {
 	Portions     int16
 }
 
-func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Recipe, error) {
+type UpdateRecipeRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Name         string
+	Description  string
+	Instructions string
+	Portions     int16
+	ImageUrl     sql.NullString
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (UpdateRecipeRow, error) {
 	row := q.db.QueryRowContext(ctx, updateRecipe,
 		arg.ID,
 		arg.Name,
@@ -469,7 +539,7 @@ func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Rec
 		arg.Instructions,
 		arg.Portions,
 	)
-	var i Recipe
+	var i UpdateRecipeRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -477,6 +547,48 @@ func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Rec
 		&i.Description,
 		&i.Instructions,
 		&i.Portions,
+		&i.ImageUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateRecipeImage = `-- name: UpdateRecipeImage :one
+UPDATE recipes
+SET image_url = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, user_id, name, description, instructions, portions, image_url, created_at, updated_at
+`
+
+type UpdateRecipeImageParams struct {
+	ID       uuid.UUID
+	ImageUrl sql.NullString
+}
+
+type UpdateRecipeImageRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Name         string
+	Description  string
+	Instructions string
+	Portions     int16
+	ImageUrl     sql.NullString
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) UpdateRecipeImage(ctx context.Context, arg UpdateRecipeImageParams) (UpdateRecipeImageRow, error) {
+	row := q.db.QueryRowContext(ctx, updateRecipeImage, arg.ID, arg.ImageUrl)
+	var i UpdateRecipeImageRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Description,
+		&i.Instructions,
+		&i.Portions,
+		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

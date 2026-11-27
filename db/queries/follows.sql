@@ -16,6 +16,7 @@ WHERE follower_id = $1 AND following_id = $2;
 SELECT 
     u.id,
     u.username,
+    u.avatar_url,
     f.created_at AS followed_at,
     EXISTS (
         SELECT 1 FROM follows vf
@@ -31,6 +32,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT 
     u.id,
     u.username,
+    u.avatar_url,
     f.created_at AS followed_at,
     EXISTS (
         SELECT 1 FROM follows vf

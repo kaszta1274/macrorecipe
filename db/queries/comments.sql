@@ -20,6 +20,7 @@ SELECT
     comments.id, 
     comments.user_id, 
     users.username,
+    users.avatar_url,
     comments.recipe_id, 
     comments.body, 
     comments.created_at, 
