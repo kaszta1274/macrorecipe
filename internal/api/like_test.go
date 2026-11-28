@@ -54,11 +54,11 @@ func TestLikes(t *testing.T) {
 			http.MethodGet, "/api/users/" + alice.ID.String() + "/likes", aliceToken,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.LikedRecipe](t, rec)
-				if len(got) != 1 {
-					t.Fatalf("likes count = %d, want 1", len(got))
+				got := decodeJSON[handler.Page[handler.LikedRecipe]](t, rec)
+				if len(got.Items) != 1 || got.HasMore {
+					t.Fatalf("got (len=%d has_more=%v), want (1, false)", len(got.Items), got.HasMore)
 				}
-				r := got[0]
+				r := got.Items[0]
 				if r.ID != bobRecipe.ID || r.Name != bobRecipe.Name || r.Description != bobRecipe.Description {
 					t.Fatalf("unexpected liked recipe: %+v", r)
 				}
@@ -78,9 +78,9 @@ func TestLikes(t *testing.T) {
 			http.MethodGet, "/api/users/" + alice.ID.String() + "/likes", bobToken,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.LikedRecipe](t, rec)
-				if len(got) != 1 || got[0].LikedByMe {
-					t.Fatalf("expected 1 liked recipe with liked_by_me=false for bob, got %+v", got)
+				got := decodeJSON[handler.Page[handler.LikedRecipe]](t, rec)
+				if len(got.Items) != 1 || got.Items[0].LikedByMe || got.HasMore {
+					t.Fatalf("expected 1 liked recipe with liked_by_me=false and has_more=false for bob, got %+v", got)
 				}
 			},
 		},
@@ -89,9 +89,9 @@ func TestLikes(t *testing.T) {
 			http.MethodGet, "/api/users/" + testSeed.Admin.ID.String() + "/likes", aliceToken,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.LikedRecipe](t, rec)
-				if len(got) != 0 {
-					t.Fatalf("likes count = %d, want 0", len(got))
+				got := decodeJSON[handler.Page[handler.LikedRecipe]](t, rec)
+				if len(got.Items) != 0 || got.HasMore {
+					t.Fatalf("got (len=%d has_more=%v), want (0, false)", len(got.Items), got.HasMore)
 				}
 			},
 		},

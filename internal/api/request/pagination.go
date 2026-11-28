@@ -5,7 +5,14 @@ import (
 	"strconv"
 )
 
-func ParsePagination(r *http.Request) (int, int, string) {
+type Pagination struct {
+	Page   int
+	Limit  int
+	Offset int
+	Query  string
+}
+
+func ParsePagination(r *http.Request) Pagination {
 	page, err := strconv.Atoi(r.URL.Query().Get("page"))
 	if err != nil || page < 1 {
 		page = 1
@@ -18,9 +25,10 @@ func ParsePagination(r *http.Request) (int, int, string) {
 		limit = 100
 	}
 
-	offset := (page - 1) * limit
-
-	query := r.URL.Query().Get("query")
-
-	return limit, offset, query
+	return Pagination{
+		Page:   page,
+		Limit:  limit,
+		Offset: (page - 1) * limit,
+		Query:  r.URL.Query().Get("query"),
+	}
 }

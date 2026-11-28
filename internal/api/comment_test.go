@@ -61,11 +61,11 @@ func TestComments(t *testing.T) {
 			http.MethodGet, "/api/recipes/" + aliceRecipe.ID.String() + "/comments", aliceToken, nil,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.CommentsByRecipeId](t, rec)
-				if len(got) != 2 {
-					t.Fatalf("comments count = %d, want 2", len(got))
+				got := decodeJSON[handler.Page[handler.CommentsByRecipeId]](t, rec)
+				if len(got.Items) != 2 || got.HasMore {
+					t.Fatalf("got (len=%d has_more=%v), want (2, false)", len(got.Items), got.HasMore)
 				}
-				for _, c := range got {
+				for _, c := range got.Items {
 					if c.RecipeID != aliceRecipe.ID || c.Username == "" || c.Body == "" {
 						t.Fatalf("invalid listed comment: %+v", c)
 					}
@@ -77,9 +77,9 @@ func TestComments(t *testing.T) {
 			http.MethodGet, "/api/recipes/" + oatmealRecipe.ID.String() + "/comments", aliceToken, nil,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.CommentsByRecipeId](t, rec)
-				if len(got) != 0 {
-					t.Fatalf("comments count = %d, want 0", len(got))
+				got := decodeJSON[handler.Page[handler.CommentsByRecipeId]](t, rec)
+				if len(got.Items) != 0 || got.HasMore {
+					t.Fatalf("got (len=%d has_more=%v), want (0, false)", len(got.Items), got.HasMore)
 				}
 			},
 		},

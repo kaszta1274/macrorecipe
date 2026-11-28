@@ -145,19 +145,19 @@ func (h *RecipeHandler) ListFeedRecipes(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	limit, offset, _ := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListFeedRecipes(r.Context(), database.ListFeedRecipesParams{
 		ViewerID: viewerID,
-		Offset:   int32(offset),
-		Limit:    int32(limit),
+		Offset:   int32(p.Offset),
+		Limit:    int32(p.Limit + 1),
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list feed recipes", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toFeedRecipeSummary))
+	response.RespondWithJSON(w, http.StatusOK, newPage(recipes, p, toFeedRecipeSummary))
 }
 
 func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request) {
@@ -173,13 +173,13 @@ func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	limit, offset, query := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
-		SearchQuery:   query,
+		SearchQuery:   p.Query,
 		IngredientIds: ingredientIDs,
-		Limit:         int32(limit),
-		Offset:        int32(offset),
+		Limit:         int32(p.Limit + 1),
+		Offset:        int32(p.Offset),
 		ViewerID:      viewerID,
 	})
 	if err != nil {
@@ -187,7 +187,7 @@ func (h *RecipeHandler) ListRecipesByName(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipeSummary))
+	response.RespondWithJSON(w, http.StatusOK, newPage(recipes, p, toRecipeSummary))
 }
 
 func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
@@ -197,14 +197,14 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit, offset, query := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
 		AuthorID:      uuid.NullUUID{UUID: userId, Valid: true},
-		SearchQuery:   query,
+		SearchQuery:   p.Query,
 		IngredientIds: []uuid.UUID{},
-		Limit:         int32(limit),
-		Offset:        int32(offset),
+		Limit:         int32(p.Limit + 1),
+		Offset:        int32(p.Offset),
 		ViewerID:      userId,
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func (h *RecipeHandler) ListMyRecipes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipeSummary))
+	response.RespondWithJSON(w, http.StatusOK, newPage(recipes, p, toRecipeSummary))
 }
 
 func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Request) {
@@ -234,14 +234,14 @@ func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	limit, offset, query := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	recipes, err := h.DB.ListRecipeSummaries(r.Context(), database.ListRecipeSummariesParams{
 		AuthorID:      uuid.NullUUID{UUID: userId, Valid: true},
-		SearchQuery:   query,
+		SearchQuery:   p.Query,
 		IngredientIds: []uuid.UUID{},
-		Limit:         int32(limit),
-		Offset:        int32(offset),
+		Limit:         int32(p.Limit + 1),
+		Offset:        int32(p.Offset),
 		ViewerID:      viewerID,
 	})
 	if err != nil {
@@ -249,7 +249,7 @@ func (h *RecipeHandler) ListRecipesByUserId(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(recipes, toRecipeSummary))
+	response.RespondWithJSON(w, http.StatusOK, newPage(recipes, p, toRecipeSummary))
 }
 
 func (h *RecipeHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request) {

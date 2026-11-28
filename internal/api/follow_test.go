@@ -125,11 +125,11 @@ func assertFollow(wantFollowerID, wantFollowingID uuid.UUID) func(*testing.T, *h
 func assertUserListSingle(wantID uuid.UUID, wantUsername string, wantFollowedByMe bool) func(*testing.T, *httptest.ResponseRecorder) {
 	return func(t *testing.T, rec *httptest.ResponseRecorder) {
 		t.Helper()
-		got := decodeJSON[[]handler.UserListItem](t, rec)
-		if len(got) != 1 {
-			t.Fatalf("user list count = %d, want 1", len(got))
+		got := decodeJSON[handler.Page[handler.UserListItem]](t, rec)
+		if len(got.Items) != 1 || got.HasMore {
+			t.Fatalf("got (len=%d has_more=%v), want (1, false)", len(got.Items), got.HasMore)
 		}
-		item := got[0]
+		item := got.Items[0]
 		if item.ID != wantID || item.Username != wantUsername || item.FollowedByMe != wantFollowedByMe || item.FollowedAt.IsZero() {
 			t.Fatalf("item = %+v, want (%s, %q, followed_by_me=%v)", item, wantID, wantUsername, wantFollowedByMe)
 		}

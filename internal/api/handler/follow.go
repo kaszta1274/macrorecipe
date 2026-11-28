@@ -127,20 +127,20 @@ func (h *FollowHandler) ListFollowersByUserId(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	limit, offset, _ := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	followers, err := h.DB.ListFollowersByUserId(r.Context(), database.ListFollowersByUserIdParams{
 		ViewerID: viewerID,
 		UserID:   userID,
-		Offset:   int32(offset),
-		Limit:    int32(limit),
+		Offset:   int32(p.Offset),
+		Limit:    int32(p.Limit + 1),
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list followers", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(followers, toFollowerItem))
+	response.RespondWithJSON(w, http.StatusOK, newPage(followers, p, toFollowerItem))
 }
 
 func (h *FollowHandler) ListFollowingsByUserId(w http.ResponseWriter, r *http.Request) {
@@ -164,20 +164,20 @@ func (h *FollowHandler) ListFollowingsByUserId(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	limit, offset, _ := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	followings, err := h.DB.ListFollowingsByUserId(r.Context(), database.ListFollowingsByUserIdParams{
 		ViewerID: viewerID,
 		UserID:   userID,
-		Offset:   int32(offset),
-		Limit:    int32(limit),
+		Offset:   int32(p.Offset),
+		Limit:    int32(p.Limit + 1),
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list following", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(followings, toFollowingItem))
+	response.RespondWithJSON(w, http.StatusOK, newPage(followings, p, toFollowingItem))
 }
 
 func toFollow(f database.Follow) Follow {

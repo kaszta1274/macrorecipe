@@ -113,19 +113,19 @@ func (h *CommentHandler) ListCommentsByRecipeId(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	limit, offset, _ := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	comments, err := h.DB.ListCommentsByRecipeId(r.Context(), database.ListCommentsByRecipeIdParams{
 		RecipeID: recipe.ID,
-		Limit:    int32(limit),
-		Offset:   int32(offset),
+		Limit:    int32(p.Limit + 1),
+		Offset:   int32(p.Offset),
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list comments", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(comments, toRecipeComment))
+	response.RespondWithJSON(w, http.StatusOK, newPage(comments, p, toRecipeComment))
 }
 
 func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {

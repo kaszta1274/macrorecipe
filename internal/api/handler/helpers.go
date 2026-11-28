@@ -9,9 +9,17 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/kaszta1274/macrorecipe/internal/api/request"
 	"github.com/kaszta1274/macrorecipe/internal/api/response"
 	"github.com/kaszta1274/macrorecipe/internal/storage"
 )
+
+type Page[T any] struct {
+	Items   []T  `json:"items"`
+	Page    int  `json:"page"`
+	Limit   int  `json:"limit"`
+	HasMore bool `json:"has_more"`
+}
 
 type Macros struct {
 	Calories      float32 `json:"calories"`
@@ -85,4 +93,17 @@ func mapSlice[In, Out any](in []In, fn func(In) Out) []Out {
 		out[i] = fn(v)
 	}
 	return out
+}
+
+func newPage[In, Out any](rows []In, p request.Pagination, fn func(In) Out) Page[Out] {
+	hasMore := len(rows) > p.Limit
+	if hasMore {
+		rows = rows[:p.Limit]
+	}
+	return Page[Out]{
+		Items:   mapSlice(rows, fn),
+		Page:    p.Page,
+		Limit:   p.Limit,
+		HasMore: hasMore,
+	}
 }

@@ -90,12 +90,12 @@ func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	limit, offset, _ := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	likes, err := h.DB.ListLikesByUserId(r.Context(), database.ListLikesByUserIdParams{
 		UserID:   userId,
-		Limit:    int32(limit),
-		Offset:   int32(offset),
+		Limit:    int32(p.Limit + 1),
+		Offset:   int32(p.Offset),
 		ViewerID: viewerID,
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func (h *LikeHandler) ListLikesByUserId(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(likes, toLikedRecipe))
+	response.RespondWithJSON(w, http.StatusOK, newPage(likes, p, toLikedRecipe))
 }
 
 func (h *LikeHandler) DeleteLike(w http.ResponseWriter, r *http.Request) {

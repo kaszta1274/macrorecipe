@@ -105,23 +105,19 @@ func (h *IngredientHandler) GetIngredientById(w http.ResponseWriter, r *http.Req
 }
 
 func (h *IngredientHandler) ListIngredients(w http.ResponseWriter, r *http.Request) {
-	limit, offset, query := request.ParsePagination(r)
+	p := request.ParsePagination(r)
 
 	ingredients, err := h.DB.ListIngredients(r.Context(), database.ListIngredientsParams{
-		Limit:       int32(limit),
-		Offset:      int32(offset),
-		SearchQuery: query,
+		Limit:       int32(p.Limit + 1),
+		Offset:      int32(p.Offset),
+		SearchQuery: p.Query,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
-		response.RespondWithError(w, r, http.StatusNotFound, "ingredients not found", nil)
-		return
-	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, "could not list ingredients", err)
 		return
 	}
 
-	response.RespondWithJSON(w, http.StatusOK, mapSlice(ingredients, toIngredient))
+	response.RespondWithJSON(w, http.StatusOK, newPage(ingredients, p, toIngredient))
 }
 
 func (h *IngredientHandler) UpdateIngredient(w http.ResponseWriter, r *http.Request) {

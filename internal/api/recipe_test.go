@@ -100,11 +100,11 @@ func TestRecipes(t *testing.T) {
 			http.MethodGet, "/api/recipes?query=Chicken", bobToken, nil,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.RecipeSummary](t, rec)
-				if len(got) != 1 {
-					t.Fatalf("recipe count = %d, want 1", len(got))
+				got := decodeJSON[handler.Page[handler.RecipeSummary]](t, rec)
+				if len(got.Items) != 1 || got.HasMore {
+					t.Fatalf("got (len=%d has_more=%v), want (1, false)", len(got.Items), got.HasMore)
 				}
-				r := got[0]
+				r := got.Items[0]
 				if r.ID != aliceRecipe.ID || r.Author.Username != alice.Username {
 					t.Fatalf("unexpected recipe summary: %+v", r)
 				}
@@ -113,6 +113,17 @@ func TestRecipes(t *testing.T) {
 				}
 				if r.LikesCount != 1 || !r.LikedByMe || r.CommentsCount != 2 {
 					t.Fatalf("counts = (likes=%d liked=%v comments=%d), want (1, true, 2)", r.LikesCount, r.LikedByMe, r.CommentsCount)
+				}
+			},
+		},
+		{
+			"list recipes paginated has_more true",
+			http.MethodGet, "/api/recipes?page=1&limit=1", aliceToken, nil,
+			http.StatusOK,
+			func(t *testing.T, rec *httptest.ResponseRecorder) {
+				got := decodeJSON[handler.Page[handler.RecipeSummary]](t, rec)
+				if len(got.Items) != 1 || got.Page != 1 || got.Limit != 1 || !got.HasMore {
+					t.Fatalf("got (len=%d page=%d limit=%d has_more=%v), want (1, 1, 1, true)", len(got.Items), got.Page, got.Limit, got.HasMore)
 				}
 			},
 		},
@@ -162,15 +173,16 @@ func TestRecipes(t *testing.T) {
 			http.MethodGet, "/api/recipes/feed", aliceToken, nil,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.RecipeSummary](t, rec)
-				if len(got) != 1 || got[0].ID != bobRecipe.ID {
-					t.Fatalf("feed = %+v, want [%s]", got, bobRecipe.ID)
+				got := decodeJSON[handler.Page[handler.RecipeSummary]](t, rec)
+				if len(got.Items) != 1 || got.Items[0].ID != bobRecipe.ID || got.HasMore {
+					t.Fatalf("feed = %+v, want [%s] with has_more=false", got, bobRecipe.ID)
 				}
-				if got[0].Author.ID != bob.ID || got[0].Author.Username != bob.Username {
-					t.Fatalf("feed author = %+v, want (%s, %q)", got[0].Author, bob.ID, bob.Username)
+				r := got.Items[0]
+				if r.Author.ID != bob.ID || r.Author.Username != bob.Username {
+					t.Fatalf("feed author = %+v, want (%s, %q)", r.Author, bob.ID, bob.Username)
 				}
-				if !got[0].LikedByMe || got[0].LikesCount != 1 || got[0].MacrosPerPortion.Calories <= 0 {
-					t.Fatalf("unexpected feed summary: %+v", got[0])
+				if !r.LikedByMe || r.LikesCount != 1 || r.MacrosPerPortion.Calories <= 0 {
+					t.Fatalf("unexpected feed summary: %+v", r)
 				}
 			},
 		},
@@ -254,9 +266,9 @@ func assertRecipe(wantID, wantUserID uuid.UUID, wantName string, wantPortions in
 func assertRecipeSummaryCount(want int) func(*testing.T, *httptest.ResponseRecorder) {
 	return func(t *testing.T, rec *httptest.ResponseRecorder) {
 		t.Helper()
-		got := decodeJSON[[]handler.RecipeSummary](t, rec)
-		if len(got) != want {
-			t.Fatalf("recipe count = %d, want %d", len(got), want)
+		got := decodeJSON[handler.Page[handler.RecipeSummary]](t, rec)
+		if len(got.Items) != want || got.HasMore {
+			t.Fatalf("got (len=%d has_more=%v), want (%d, false)", len(got.Items), got.HasMore, want)
 		}
 	}
 }
@@ -264,13 +276,13 @@ func assertRecipeSummaryCount(want int) func(*testing.T, *httptest.ResponseRecor
 func assertRecipeSummaryIDs(wantIDs ...uuid.UUID) func(*testing.T, *httptest.ResponseRecorder) {
 	return func(t *testing.T, rec *httptest.ResponseRecorder) {
 		t.Helper()
-		got := decodeJSON[[]handler.RecipeSummary](t, rec)
-		if len(got) != len(wantIDs) {
-			t.Fatalf("recipe count = %d, want %d", len(got), len(wantIDs))
+		got := decodeJSON[handler.Page[handler.RecipeSummary]](t, rec)
+		if len(got.Items) != len(wantIDs) || got.HasMore {
+			t.Fatalf("got (len=%d has_more=%v), want (%d, false)", len(got.Items), got.HasMore, len(wantIDs))
 		}
 		for i, wantID := range wantIDs {
-			if got[i].ID != wantID {
-				t.Fatalf("recipe[%d].id = %s, want %s", i, got[i].ID, wantID)
+			if got.Items[i].ID != wantID {
+				t.Fatalf("recipe[%d].id = %s, want %s", i, got.Items[i].ID, wantID)
 			}
 		}
 	}
@@ -279,11 +291,11 @@ func assertRecipeSummaryIDs(wantIDs ...uuid.UUID) func(*testing.T, *httptest.Res
 func assertRecipeSummaryAuthor(wantID uuid.UUID, wantUsername string, wantCount int) func(*testing.T, *httptest.ResponseRecorder) {
 	return func(t *testing.T, rec *httptest.ResponseRecorder) {
 		t.Helper()
-		got := decodeJSON[[]handler.RecipeSummary](t, rec)
-		if len(got) != wantCount {
-			t.Fatalf("recipe count = %d, want %d", len(got), wantCount)
+		got := decodeJSON[handler.Page[handler.RecipeSummary]](t, rec)
+		if len(got.Items) != wantCount || got.HasMore {
+			t.Fatalf("got (len=%d has_more=%v), want (%d, false)", len(got.Items), got.HasMore, wantCount)
 		}
-		for _, r := range got {
+		for _, r := range got.Items {
 			if r.Author.ID != wantID || r.Author.Username != wantUsername {
 				t.Fatalf("author = %+v, want (%s, %q)", r.Author, wantID, wantUsername)
 			}

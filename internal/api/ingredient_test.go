@@ -53,21 +53,28 @@ func TestIngredients(t *testing.T) {
 			"list all",
 			http.MethodGet, "/api/ingredients?limit=50", aliceToken, nil,
 			http.StatusOK,
-			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.Ingredient](t, rec)
-				if len(got) != len(testSeed.Ingredients) {
-					t.Fatalf("ingredient count = %d, want %d", len(got), len(testSeed.Ingredients))
-				}
-			},
+			assertIngredientPage(len(testSeed.Ingredients), 1, 50, false),
+		},
+		{
+			"list paginated first page",
+			http.MethodGet, "/api/ingredients?page=1&limit=5", aliceToken, nil,
+			http.StatusOK,
+			assertIngredientPage(5, 1, 5, true),
+		},
+		{
+			"list paginated last page",
+			http.MethodGet, "/api/ingredients?page=3&limit=5", aliceToken, nil,
+			http.StatusOK,
+			assertIngredientPage(2, 3, 5, false),
 		},
 		{
 			"list filtered by query",
 			http.MethodGet, "/api/ingredients?query=Chicken", aliceToken, nil,
 			http.StatusOK,
 			func(t *testing.T, rec *httptest.ResponseRecorder) {
-				got := decodeJSON[[]handler.Ingredient](t, rec)
-				if len(got) != 1 || got[0].Name != chicken.Name {
-					t.Fatalf("filtered ingredients = %+v, want [%q]", got, chicken.Name)
+				got := decodeJSON[handler.Page[handler.Ingredient]](t, rec)
+				if len(got.Items) != 1 || got.Items[0].Name != chicken.Name || got.HasMore {
+					t.Fatalf("filtered ingredients = %+v, want [%q] with has_more=false", got, chicken.Name)
 				}
 			},
 		},
@@ -139,6 +146,16 @@ func TestIngredients(t *testing.T) {
 				tc.check(t, rec)
 			}
 		})
+	}
+}
+
+func assertIngredientPage(wantLen, wantPage, wantLimit int, wantHasMore bool) func(*testing.T, *httptest.ResponseRecorder) {
+	return func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		got := decodeJSON[handler.Page[handler.Ingredient]](t, rec)
+		if len(got.Items) != wantLen || got.Page != wantPage || got.Limit != wantLimit || got.HasMore != wantHasMore {
+			t.Fatalf("got (len=%d page=%d limit=%d has_more=%v), want (%d, %d, %d, %v)", len(got.Items), got.Page, got.Limit, got.HasMore, wantLen, wantPage, wantLimit, wantHasMore)
+		}
 	}
 }
 
